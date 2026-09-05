@@ -3,10 +3,9 @@
 Statement reads never touch ``repositories.statements`` from a route; they call
 ``services.visibility.resolve``.
 
-Templates are not built yet. Handlers accept the form field names the guide
-fixes (``completion``, ``observation_codes``, ``note_text``, ``visible_to``,
-``applies_to_tasks`` ...) and return JSON, so the Jinja layer can be added later
-without changing anything here.
+The user-facing handlers render Jinja templates and use normal POST/redirect
+flows.  They retain the fixed form field names (``completion``,
+``observation_codes``, ``note_text``, ``visible_to``, ``applies_to_tasks`` ...).
 """
 
 from __future__ import annotations

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% set layout = "elder" %}
+{% block title %}Mon dossier — CareCircle{% endblock %}
+{% block content %}
+  <header><p class="eyebrow">CareCircle · Mon espace</p><h1>Mon dossier</h1><p>Voici les préférences enregistrées pour {{ elder.display_name }}.</p><nav aria-label="Mon espace"><a href="/elder/access-log">Voir qui a consulté mes informations</a> <a href="/elder/proposals">Voir les changements proposés</a></nav></header>
+  {% for statement in statements %}
+    <article><p>{{ statement.statement }}</p><details><summary>Qui peut voir cette préférence</summary><form method="post" action="/elder/statements/{{ statement.id }}/visibility">{% for person in people %}<label><input type="checkbox" name="visible_to" value="{{ person.id }}" {% if person.id not in statement.hidden_from %}checked{% endif %}> {{ person.name }} peut voir cette préférence</label><br>{% endfor %}<button type="submit">Enregistrer ce changement</button></form></details></article>
+  {% else %}<p>Aucune préférence enregistrée.</p>{% endfor %}
+{% endblock %}

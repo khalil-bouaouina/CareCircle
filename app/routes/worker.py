@@ -1,62 +1,66 @@
-"""Worker surface (B17) -- the only token-scoped router. Two endpoints; this is
-the entire attack surface a stranger can reach, so keep it boring.
-
-An invalid, expired, or burned token gets the same 200 "This link has expired."
-response -- never a 404 -- so nothing leaks about whether the token ever existed.
-"""
+"""The isolated, token-scoped worker surface."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse
 
 from .. import config
 from ..repositories import checkouts, observation_codes, people, visits
 from ..services import brief, foldback, tokens
+from ..web import templates
 
 router = APIRouter(prefix="/v", tags=["worker"])
 
-EXPIRED = {"ok": False, "expired": True, "message": "This link has expired."}
 
-
-def _expired() -> JSONResponse:
-    return JSONResponse(EXPIRED, status_code=200)
+def _expired(request: Request) -> HTMLResponse:
+    """A neutral 200 response that does not disclose token existence."""
+    return templates.TemplateResponse(
+        request=request, name="worker/brief.html", context={"expired": True}, status_code=200
+    )
 
 
 @router.get("/{token}")
-def get_brief(token: str):
+def get_brief(token: str, request: Request, screen: str = "brief"):
     visit = tokens.validate(token)
     if visit is None:
-        return _expired()
+        return _expired(request)
 
-    lines, fallback_used, total = brief.build_brief(visit.id)
+    if screen == "checkout":
+        if visit.state != "briefed":
+            return _expired(request)
+        return templates.TemplateResponse(request=request, name="worker/checkout.html", context={
+            "token": token,
+            "completions": config.COMPLETIONS,
+            "observation_codes": observation_codes.list_codes(),
+        })
+    if screen != "brief":
+        return _expired(request)
+
+    lines, _fallback_used, total = brief.build_brief(visit.id)
     elder = people.get_elder(visit.elder_id)
-    return {
-        "ok": True,
+    return templates.TemplateResponse(request=request, name="worker/brief.html", context={
+        "visit": visit,
         "header": f"{elder.first_name} · {visit.task_type.replace('_', ' ')} · {visit.start_hhmm}",
-        "elder_first_name": elder.first_name,
-        "task_type": visit.task_type,
-        "scheduled_start": visit.scheduled_start,
-        "scheduled_end": visit.scheduled_end,
-        "lines": [l.__dict__ for l in lines],
+        "lines": lines,
+        "total_statements": total,
         "footer": f"{len(lines)} of {total} notes, chosen for this visit.",
-        "fallback_used": fallback_used,
-        "completions": config.COMPLETIONS,
-        "observation_codes": [c.to_dict() for c in observation_codes.list_codes()],
-    }
+        "token": token,
+    })
 
 
-@router.post("/{token}/checkout", status_code=201)
+@router.post("/{token}/checkout")
 def submit_checkout(
     token: str,
+    request: Request,
     completion: str = Form(...),
     observation_codes_: list[str] = Form(default=[], alias="observation_codes"),
     note_text: str | None = Form(default=None, max_length=2000),
 ):
-    # validate again -- never trust that the GET happened; a form left open past the window must not submit
+    # Validate again: the form may have remained open past the token window.
     visit = tokens.validate(token)
     if visit is None:
-        return _expired()
+        return _expired(request)
     if visit.state != "briefed":
         raise HTTPException(409, "Open the brief before checking out")
     if completion not in config.COMPLETIONS:
@@ -66,13 +70,6 @@ def submit_checkout(
         raise HTTPException(422, f"Unknown observation codes: {sorted(unknown)}")
 
     checkout_id = checkouts.create_checkout(visit.id, completion, observation_codes_, note_text)
-    visits.set_state(visit.id, "completed")  # this burns the token
-    created = foldback.proposals_from_checkout(checkout_id)
-
-    return {
-        "ok": True,
-        "checkout_id": checkout_id,
-        "visit_state": "completed",
-        "proposals_created": created,
-        "message": "Thank you. This link is now closed.",
-    }
+    visits.set_state(visit.id, "completed")
+    foldback.proposals_from_checkout(checkout_id)
+    return templates.TemplateResponse(request=request, name="worker/done.html", context={})

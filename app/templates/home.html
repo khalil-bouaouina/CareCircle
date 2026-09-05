@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% set layout = "public" %}
+{% block title %}CareCircle — Démonstration{% endblock %}
+{% block content %}
+  <header>
+    <p class="eyebrow">Coordination des soins</p>
+    <h1>CareCircle</h1>
+    <p>Choisissez une vue de démonstration.</p>
+  </header>
+  <nav class="role-picker" aria-label="Choisir une vue de démonstration">
+    <a href="/caregiver">Console de l’aidant</a>
+    <a href="/elder">Vue de la personne aidée</a>
+    {% if worker_link %}<a href="{{ worker_link }}">Lien intervenant</a>{% else %}<p>Le lien intervenant est affiché immédiatement après la création d’une visite.</p>{% endif %}
+  </nav>
+{% endblock %}

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% set layout = "console" %}
+{% block title %}Propositions — CareCircle{% endblock %}
+{% block content %}
+  <header><p class="eyebrow">CareCircle · Espace aidant</p><h1>Propositions</h1><nav aria-label="Console aidant"><a href="/caregiver/record">Dossier</a> <a href="/caregiver/visits">Visites</a> <a href="/caregiver/proposals">Propositions</a></nav></header>
+  {% for proposal in proposals %}<article><p>« {{ proposal.suggested_statement }} »</p><p>Cette proposition provient d’observations structurées répétées.</p><form method="post" action="/caregiver/proposals/{{ proposal.id }}/decide"><input type="hidden" name="decision" value="approve"><label>Catégorie <select name="category">{% for category in categories %}<option value="{{ category }}">{{ category }}</option>{% endfor %}</select></label><button type="submit">Ajouter au dossier</button></form><form method="post" action="/caregiver/proposals/{{ proposal.id }}/decide"><input type="hidden" name="decision" value="reject"><button class="secondary" type="submit">Ignorer</button></form></article>{% else %}<p class="empty-state">Rien en attente. Les propositions apparaissent lorsque des observations semblent durables.</p>{% endfor %}
+{% endblock %}

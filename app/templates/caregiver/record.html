@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% set layout = "console" %}
+{% macro scope_chips(statement, people) -%}
+  <span class="scope-chip">{% if statement.applies_to_tasks %}Pour : {{ statement.applies_to_tasks | join(', ') }}{% else %}Toutes les visites{% endif %}</span>
+  {% if statement.time_start %}<span class="scope-chip">Entre {{ statement.time_start }} et {{ statement.time_end }}</span>{% endif %}
+  {% for person in people if person.id in statement.hidden_from %}<span class="scope-chip">Masqué à {{ person.name }}</span>{% endfor %}
+{%- endmacro %}
+{% block title %}Dossier — CareCircle{% endblock %}
+{% block content %}
+  <header>
+    <p class="eyebrow">CareCircle · Espace aidant</p>
+    <h1>Dossier de {{ elder.display_name }}</h1>
+    <p>Mode de décision : {{ elder.capacity_mode }}</p>
+    <nav aria-label="Console aidant"><a href="/caregiver/record">Dossier</a> <a href="/caregiver/visits">Visites</a> <a href="/caregiver/proposals">Propositions</a></nav>
+  </header>
+  {% for category in categories %}
+    <section>
+      <h2>{{ category }}</h2>
+      {% for statement in statements_by_category[category] %}
+        <article>
+          <p>{{ statement.statement }}</p>
+          <p>{{ scope_chips(statement, people) }}</p>
+          <details>
+            <summary>Gérer qui peut voir cette préférence</summary>
+            <form method="post" action="/caregiver/statements/{{ statement.id }}/visibility">
+              {% for person in people %}
+                <label><input type="checkbox" name="visible_to" value="{{ person.id }}" {% if person.id not in statement.hidden_from %}checked{% endif %}> {{ person.name }} peut voir cette préférence</label><br>
+              {% endfor %}
+              <button type="submit">Enregistrer la visibilité</button>
+            </form>
+          </details>
+        </article>
+      {% else %}<p>Aucune préférence dans cette catégorie.</p>{% endfor %}
+    </section>
+  {% endfor %}
+  <details>
+    <summary>Ajouter une préférence</summary>
+    <form method="post" action="/caregiver/statements">
+      <p><label>Préférence <input name="statement" required minlength="3" maxlength="500" placeholder="Ex. Une intervenante est requise pour le bain"></label></p>
+      <p><label>Catégorie <select name="category">{% for category in categories %}<option value="{{ category }}">{{ category }}</option>{% endfor %}</select></label></p>
+      <fieldset><legend>S’applique à ces tâches (aucune sélection = toutes)</legend>{% for task in task_types %}<label><input type="checkbox" name="applies_to_tasks" value="{{ task }}"> {{ task }}</label><br>{% endfor %}</fieldset>
+      <details><summary>Exclure certaines tâches</summary>{% for task in task_types %}<label><input type="checkbox" name="excluded_tasks" value="{{ task }}"> Ne pas afficher pour {{ task }}</label><br>{% endfor %}</details>
+      <p><label>Heure de début <input type="time" name="time_start"></label> <label>Heure de fin <input type="time" name="time_end"></label></p>
+      <details><summary>Limiter la visibilité</summary>{% for person in people %}<label><input type="checkbox" name="hidden_from" value="{{ person.id }}"> Masquer à {{ person.name }}</label><br>{% endfor %}</details>
+      <button type="submit">Ajouter la préférence</button>
+    </form>
+  </details>
+{% endblock %}

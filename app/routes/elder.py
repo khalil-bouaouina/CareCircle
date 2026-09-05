@@ -4,23 +4,27 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, Form, HTTPException
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import RedirectResponse
 
 from .. import config
 from ..deps import Session_, elder_session
 from ..models import AccessEntry, Purpose
 from ..repositories import access_log, people, proposals, statements
 from ..services import foldback, visibility
+from ..web import templates
 from . import proposal_out, statement_out
 
 router = APIRouter(prefix="/elder", tags=["elder"])
 
 
 @router.get("")
-def my_record(session: Session_ = Depends(elder_session)):
+def my_record(request: Request, session: Session_ = Depends(elder_session)):
     rows = visibility.resolve(session.elder.id, session.actor, Purpose())
     everyone = [p.to_dict() for p in people.list_people(session.elder.id) if p.role != "worker"]
-    return {"elder": session.elder.to_dict(), "people": everyone, "statements": [statement_out(s) for s in rows]}
+    return templates.TemplateResponse(request=request, name="elder/record.html", context={
+        "elder": session.elder, "people": everyone, "statements": [statement_out(s) for s in rows],
+    })
 
 
 @router.post("/statements/{statement_id}/visibility")
@@ -38,20 +42,24 @@ def set_visibility(
     access_log.log_access(
         session.elder.id, session.actor.label, "visibility_change", f'who can see "{row.statement[:50]}"'
     )
-    return statement_out(row)
+    return RedirectResponse("/elder", status_code=303)
 
 
 @router.get("/access-log")
-def my_access_log(limit: int = 50, session: Session_ = Depends(elder_session)):
+def my_access_log(request: Request, limit: int = 50, session: Session_ = Depends(elder_session)):
     entries = access_log.list_access(session.elder.id, limit=limit)
-    return [{**e.to_dict(), "sentence": format_access_sentence(e)} for e in entries]
+    return templates.TemplateResponse(request=request, name="elder/access_log.html", context={
+        "entries": [format_access_sentence(entry) for entry in entries],
+    })
 
 
 @router.get("/proposals")
-def my_proposals(session: Session_ = Depends(elder_session)):
+def my_proposals(request: Request, session: Session_ = Depends(elder_session)):
     """The UI shows one at a time; ``first`` is the one to render, ``pending`` the rest."""
     pending = [proposal_out(p) for p in proposals.list_pending(session.elder.id)]
-    return {"first": pending[0] if pending else None, "pending": pending, "count": len(pending)}
+    return templates.TemplateResponse(request=request, name="elder/proposals.html", context={
+        "proposal": pending[0] if pending else None, "categories": config.CATEGORIES,
+    })
 
 
 @router.post("/proposals/{proposal_id}/decide")
@@ -70,13 +78,12 @@ def decide_proposal(
         raise HTTPException(404, "Proposal not found")
     try:
         if decision == "approve":
-            statement_id = foldback.approve_proposal(proposal, session.actor, None, category or None)
+            foldback.approve_proposal(proposal, session.actor, None, category or None)
         else:
             foldback.reject_proposal(proposal, session.actor, None)
-            statement_id = None
     except foldback.NotAllowed as exc:
         raise HTTPException(403, exc.detail) from exc
-    return {"proposal": proposal_out(proposals.get_proposal(proposal_id)), "statement_id": statement_id}
+    return RedirectResponse("/elder/proposals", status_code=303)
 
 
 # --- sentences ------------------------------------------------------------------

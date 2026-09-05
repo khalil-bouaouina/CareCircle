@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% set layout = "worker" %}
+{% block title %}Brief de visite{% endblock %}
+{% block content %}
+  {% if expired %}
+    <p>Ce lien a expiré.</p>
+  {% else %}
+    <header><p>{{ header }}</p></header>
+    {% for line in lines %}<p{% if line.critical %} class="critical"{% endif %}>{{ line.text }}</p>{% endfor %}
+    <p class="brief-footer">{{ footer }}</p><p class="worker-action"><a href="/v/{{ token }}?screen=checkout">Terminé — 1 minute</a></p>
+  {% endif %}
+{% endblock %}

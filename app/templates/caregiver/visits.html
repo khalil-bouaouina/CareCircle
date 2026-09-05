@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% set layout = "console" %}
+{% macro state_badge(state) -%}
+  {% set labels = {'scheduled': 'Prévue', 'briefed': 'Brief consulté', 'completed': 'Terminée', 'expired': 'Expirée'} %}
+  <span class="status-badge" data-visit-state="{{ state }}">{{ labels.get(state, state) }}</span>
+{%- endmacro %}
+{% block title %}Visites — CareCircle{% endblock %}
+{% block content %}
+  <header><p class="eyebrow">CareCircle · Espace aidant</p><h1>Visites de {{ elder.display_name }}</h1><nav aria-label="Console aidant"><a href="/caregiver/record">Dossier</a> <a href="/caregiver/visits">Visites</a> <a href="/caregiver/proposals">Propositions</a></nav></header>
+  <section><h2>Créer une visite</h2>
+    <form method="post" action="/caregiver/visits">
+      <p><label>Nom de l’intervenant <input name="worker_name" required></label></p>
+      <p><label>Rôle <select name="worker_role"><option value="personal_support_worker">Aide à domicile</option><option value="nurse">Infirmier ou infirmière</option></select></label></p>
+      <p><label>Langue <select name="worker_language"><option value="fr">Français</option><option value="en">English</option></select></label></p>
+      <p><label>Tâche <select name="task_type">{% for task in task_types %}<option value="{{ task }}">{{ task }}</option>{% endfor %}</select></label></p>
+      <p><label>Début <input type="datetime-local" name="scheduled_start" required></label></p>
+      <p><label>Fin <input type="datetime-local" name="scheduled_end" required></label></p>
+      <button type="submit">Créer la visite et générer le lien</button>
+    </form>
+  </section>
+  <section><h2>Historique</h2>{% for item in visits %}<article><h3>{{ item.visit.scheduled_start }} — {{ item.visit.worker_name }}</h3><p>{{ item.visit.task_type }} · {{ state_badge(item.visit.state) }}</p>{% if item.checkout %}<details><summary>Compte rendu</summary><p>Réalisation : {{ item.checkout.completion }}</p><p>Observations : {{ item.checkout.observation_codes | join(', ') or 'Aucune' }}</p>{% if item.checkout.note_text %}<p>{{ item.checkout.note_text }}</p>{% endif %}</details>{% endif %}</article>{% else %}<p>Aucune visite.</p>{% endfor %}</section>
+{% endblock %}

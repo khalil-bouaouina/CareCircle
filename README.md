@@ -17,7 +17,7 @@ brief_builder/      the AI module (guide Module 3), pure Python, deletable
 data/               seed_data.json, observation_codes.json, eldercare.db (gitignored)
 ```
 
-Templates (guide Module 1) are not built yet. Routes already use the guide's
+The first server-rendered HTML templates are in `app/templates/`. Routes use the guide's
 paths and form field names and return JSON, so the Jinja layer can be added
 without changing the backend.
 

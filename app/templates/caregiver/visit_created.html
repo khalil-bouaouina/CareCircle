@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% set layout = "console" %}
+{% block head %}<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script src="/static/app.js" defer></script>{% endblock %}
+{% block title %}Lien de visite — CareCircle{% endblock %}
+{% block content %}
+  <header><p class="eyebrow">CareCircle · Espace aidant</p><h1>Visite créée</h1><p>Partagez ce lien avec l’intervenant. Il est valide de {{ valid_from }} à {{ valid_until }}.</p></header>
+  <p><code id="visit-link">{{ link }}</code></p><button type="button" data-copy-for="visit-link" onclick="copyLink('visit-link')">Copier le lien</button><div id="visit-qr" aria-label="Code QR du lien de visite"></div><script>window.addEventListener('DOMContentLoaded', () => renderQR('visit-qr', {{ link | tojson }}));</script><p><a href="{{ link }}" target="_blank" rel="noopener">Prévisualiser la vue intervenant</a></p><p><a href="/caregiver/visits">Retour aux visites</a></p>
+{% endblock %}

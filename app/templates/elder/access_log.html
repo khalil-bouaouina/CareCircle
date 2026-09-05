@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% set layout = "elder" %}
+{% block title %}Consultations — CareCircle{% endblock %}
+{% block content %}
+  <header><p class="eyebrow">CareCircle · Mon espace</p><h1>Qui a consulté mes informations</h1><nav aria-label="Navigation"><a href="/elder">← Retour à mon dossier</a></nav></header>
+  {% if entries %}<ul class="access-log">{% for entry in entries %}<li>{{ entry }}</li>{% endfor %}</ul>{% else %}<p>Aucune consultation à afficher.</p>{% endif %}
+{% endblock %}

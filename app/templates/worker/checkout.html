@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% set layout = "worker" %}
+{% block title %}Fin de visite{% endblock %}
+{% block content %}
+  <header><p>Fin de visite</p></header>
+  <form method="post" action="/v/{{ token }}/checkout">
+    <fieldset><legend>La tâche a-t-elle eu lieu ?</legend><div class="choice-list">{% for completion in completions %}<label class="choice"><input type="radio" name="completion" value="{{ completion }}" {% if loop.first %}required{% endif %}> {{ completion }}</label>{% endfor %}</div></fieldset>
+    <fieldset><legend>Avez-vous remarqué quelque chose ?</legend><div class="choice-list">{% for code in observation_codes %}<label class="choice"><input type="checkbox" name="observation_codes" value="{{ code.code }}"> {{ code.label_fr }}</label>{% endfor %}</div></fieldset>
+    <p><label>Autre information (facultatif)<br><textarea name="note_text" rows="3" maxlength="2000"></textarea></label></p><button type="submit">Envoyer</button>
+  </form>
+{% endblock %}

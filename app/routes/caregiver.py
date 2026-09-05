@@ -5,14 +5,16 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Form, HTTPException
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import RedirectResponse
 
 from .. import config
 from ..deps import Session_, caregiver_session, person_session
 from ..models import Purpose
 from ..repositories import checkouts, people, proposals, statements, visits
 from ..services import foldback, tokens, visibility
-from . import proposal_out, statement_out, visit_out
+from ..web import templates
+from . import statement_out, visit_out
 
 router = APIRouter(prefix="/caregiver", tags=["caregiver"])
 
@@ -42,6 +44,11 @@ def _iso(value: str, name: str) -> str:
 # --- people --------------------------------------------------------------------
 
 
+@router.get("")
+def caregiver_home():
+    return RedirectResponse("/caregiver/record", status_code=303)
+
+
 @router.get("/people")
 def list_people(session: Session_ = Depends(person_session)):
     return [p.to_dict() for p in people.list_people(session.elder.id)]
@@ -51,16 +58,15 @@ def list_people(session: Session_ = Depends(person_session)):
 
 
 @router.get("/record")
-def record(session: Session_ = Depends(person_session)):
+def record(request: Request, session: Session_ = Depends(person_session)):
     """The caregiver's view goes through resolve() too -- she can have things hidden from her."""
     rows = visibility.resolve(session.elder.id, session.actor, Purpose())
     grouped = {c: [statement_out(s) for s in rows if s.category == c] for c in config.CATEGORIES}
-    return {
-        "elder": session.elder.to_dict(),
-        "viewing_as": session.actor.label,
-        "statements_by_category": grouped,
-        "total": len(rows),
-    }
+    return templates.TemplateResponse(request=request, name="caregiver/record.html", context={
+        "elder": session.elder, "viewing_as": session.actor.label, "statements_by_category": grouped,
+        "categories": config.CATEGORIES, "task_types": config.TASK_TYPES,
+        "people": [p for p in people.list_people(session.elder.id) if p.role != "worker"],
+    })
 
 
 @router.post("/statements", status_code=201)
@@ -80,10 +86,10 @@ def create_statement(
     ts, te = _hhmm(time_start, "time_start"), _hhmm(time_end, "time_end")
     if (ts is None) != (te is None):
         raise HTTPException(422, "time_start and time_end must be set together")
-    new_id = statements.create_statement(
+    statements.create_statement(
         session.elder.id, statement.strip(), category, applies_to_tasks, excluded_tasks, ts, te, hidden_from
     )
-    return statement_out(statements.get_statement(new_id))
+    return RedirectResponse("/caregiver/record", status_code=303)
 
 
 @router.post("/statements/{statement_id}/visibility")
@@ -98,19 +104,25 @@ def set_visibility(
         raise HTTPException(404, "Statement not found")
     everyone = {p.id for p in people.list_people(session.elder.id) if p.role != "worker"}
     statements.set_hidden_from(statement_id, sorted(everyone - set(visible_to)))
-    return statement_out(statements.get_statement(statement_id))
+    return RedirectResponse("/caregiver/record", status_code=303)
 
 
 # --- visits ----------------------------------------------------------------------
 
 
 @router.get("/visits")
-def list_visits(session: Session_ = Depends(person_session)):
+def list_visits(request: Request, session: Session_ = Depends(person_session)):
     tokens.expire_stale()
-    out = []
+    out: list[dict] = []
     for v in visits.list_visits(session.elder.id):
-        out.append(visit_out(v, checkouts.get_checkout_for_visit(v.id), visits.get_brief(v.id) is not None))
-    return out
+        out.append({
+            "visit": v,
+            "checkout": checkouts.get_checkout_for_visit(v.id),
+            "has_brief": visits.get_brief(v.id) is not None,
+        })
+    return templates.TemplateResponse(request=request, name="caregiver/visits.html", context={
+        "elder": session.elder, "visits": out, "task_types": config.TASK_TYPES,
+    })
 
 
 @router.post("/visits", status_code=201)
@@ -134,13 +146,22 @@ def create_visit(
         start, end, token_hash, valid_from, valid_until,
     )
     # The raw token is returned once, here, and never stored.
-    return {
-        "visit": visit_out(visits.get_visit(visit_id)),
-        "token": raw,
-        "link": f"{config.FRONTEND_BASE_URL.rstrip('/')}/v/{raw}",
-        "valid_from": valid_from,
+    return RedirectResponse(
+        f"/caregiver/visits/{visit_id}/created?token={raw}&valid_from={valid_from}&valid_until={valid_until}",
+        status_code=303,
+    )
+
+
+@router.get("/visits/{visit_id}/created")
+def visit_created(visit_id: int, token: str, valid_from: str, valid_until: str, request: Request,
+                  session: Session_ = Depends(person_session)):
+    visit = visits.get_visit(visit_id)
+    if visit is None or visit.elder_id != session.elder.id:
+        raise HTTPException(404, "Visit not found")
+    return templates.TemplateResponse(request=request, name="caregiver/visit_created.html", context={
+        "link": f"{config.FRONTEND_BASE_URL.rstrip('/')}/v/{token}", "valid_from": valid_from,
         "valid_until": valid_until,
-    }
+    })
 
 
 @router.get("/visits/{visit_id}")
@@ -156,8 +177,10 @@ def get_visit(visit_id: int, session: Session_ = Depends(person_session)):
 
 
 @router.get("/proposals")
-def list_proposals(status: str | None = "pending", session: Session_ = Depends(person_session)):
-    return [proposal_out(p) for p in proposals.list_for_elder(session.elder.id, status or None)]
+def list_proposals(request: Request, status: str | None = "pending", session: Session_ = Depends(person_session)):
+    return templates.TemplateResponse(request=request, name="caregiver/proposals.html", context={
+        "proposals": proposals.list_for_elder(session.elder.id, status or None), "categories": config.CATEGORIES,
+    })
 
 
 @router.post("/proposals/{proposal_id}/decide")
@@ -176,9 +199,9 @@ def decide_proposal(
         if decision == "approve":
             if category:
                 _in(category, config.CATEGORIES, "category")
-            statement_id = foldback.approve_proposal(proposal, session.actor, session.role, category or None)
-            return {"proposal": proposal_out(proposals.get_proposal(proposal_id)), "statement_id": statement_id}
+            foldback.approve_proposal(proposal, session.actor, session.role, category or None)
+            return RedirectResponse("/caregiver/proposals", status_code=303)
         foldback.reject_proposal(proposal, session.actor, session.role)
-        return {"proposal": proposal_out(proposals.get_proposal(proposal_id)), "statement_id": None}
+        return RedirectResponse("/caregiver/proposals", status_code=303)
     except foldback.NotAllowed as exc:
         raise HTTPException(403, exc.detail) from exc

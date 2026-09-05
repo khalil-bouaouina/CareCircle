@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% set layout = "elder" %}
+{% block title %}Changement proposé — CareCircle{% endblock %}
+{% block content %}
+  <header><p class="eyebrow">CareCircle · Mon espace</p><h1>Changement proposé</h1><nav aria-label="Navigation"><a href="/elder">← Retour à mon dossier</a></nav></header>
+  {% if proposal %}<article><p>Voulez-vous ajouter cette préférence à votre dossier ?</p><p>« {{ proposal.suggested_statement }} »</p><form method="post" action="/elder/proposals/{{ proposal.id }}/decide"><input type="hidden" name="decision" value="approve"><label>Catégorie <select name="category">{% for category in categories %}<option value="{{ category }}">{{ category }}</option>{% endfor %}</select></label><button type="submit">Oui, ajouter cette préférence</button></form><form method="post" action="/elder/proposals/{{ proposal.id }}/decide"><input type="hidden" name="decision" value="reject"><button class="secondary" type="submit">Non</button></form></article>{% else %}<p class="empty-state">Il n’y a aucun changement à confirmer.</p>{% endif %}
+{% endblock %}
