@@ -97,7 +97,9 @@ def build_brief(
     Falls back to a deterministic render if the model is unavailable or its
     output is unusable. Never raises because of the model.
     """
-    raise NotImplementedError("implemented in Part 3")
+    from . import build_brief as _impl  # lazy: avoids a circular import
+
+    return _impl(statements, visit)
 
 
 def suggest_statement(
@@ -106,4 +108,6 @@ def suggest_statement(
     recent_checkouts: list[dict],
 ) -> str | None:
     """Returns a suggested statement, or None if nothing durable."""
-    raise NotImplementedError("implemented in Part 3")
+    from .proposals import suggest_statement as _impl
+
+    return _impl(observation_codes, note_text, recent_checkouts)

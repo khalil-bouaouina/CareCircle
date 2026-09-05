@@ -1,1 +1,142 @@
-[]
+[
+  {
+    "code": "refused_bath",
+    "label_en": "Declined the bath",
+    "label_fr": "A refusé le bain",
+    "category": "care",
+    "suggested_statement": "She often declines the bath the first time it's offered. Offer it again after tea rather than insisting."
+  },
+  {
+    "code": "ate_little",
+    "label_en": "Ate very little",
+    "label_fr": "A très peu mangé",
+    "category": "care",
+    "suggested_statement": "She often eats very little at meals. Offer small portions and check back with her later."
+  },
+  {
+    "code": "skipped_medication",
+    "label_en": "Did not take medication",
+    "label_fr": "N'a pas pris ses médicaments",
+    "category": "safety",
+    "suggested_statement": "Please make sure she has actually swallowed her medication before you leave."
+  },
+  {
+    "code": "agreed_then_declined",
+    "label_en": "Said yes, then didn't follow through",
+    "label_fr": "A dit oui, puis a changé d'avis",
+    "category": "communication",
+    "suggested_statement": "She agrees to things to be polite and then changes her mind. Confirm twice before starting something she may not want."
+  },
+  {
+    "code": "hard_of_hearing_today",
+    "label_en": "Had trouble hearing",
+    "label_fr": "Avait du mal à entendre",
+    "category": "communication",
+    "suggested_statement": "Her hearing varies from day to day. Face her and speak slowly, and check her hearing aid is in."
+  },
+  {
+    "code": "confused_about_time",
+    "label_en": "Confused about the time or day",
+    "label_fr": "Confuse sur l'heure ou le jour",
+    "category": "care",
+    "suggested_statement": "She is sometimes unsure of the day and time. Gently mention both when you arrive."
+  },
+  {
+    "code": "unsteady_walking",
+    "label_en": "Unsteady on her feet",
+    "label_fr": "Instable en marchant",
+    "category": "safety",
+    "suggested_statement": "She has been unsteady walking. Stay within arm's reach whenever she is on her feet."
+  },
+  {
+    "code": "pain_reported",
+    "label_en": "Reported pain",
+    "label_fr": "A signalé une douleur",
+    "category": "care",
+    "suggested_statement": "She has been mentioning pain but won't bring it up herself. Ask about it at the start of each visit."
+  },
+  {
+    "code": "low_mood",
+    "label_en": "Seemed low or withdrawn",
+    "label_fr": "Semblait triste ou renfermée",
+    "category": "communication",
+    "suggested_statement": "Her mood is low some days. A few minutes of conversation before starting tasks helps a lot."
+  },
+  {
+    "code": "prayer_interrupted",
+    "label_en": "Visit overlapped with prayer",
+    "label_fr": "La visite a chevauché la prière",
+    "category": "observance",
+    "suggested_statement": "Visits in the afternoon often overlap with her prayers. Wait for her to finish rather than working around her."
+  },
+  {
+    "code": "fasting_today",
+    "label_en": "Was fasting",
+    "label_fr": "Jeûnait",
+    "category": "observance",
+    "suggested_statement": "On days she is fasting, do not offer food or drink before sunset."
+  },
+  {
+    "code": "wanted_family_called",
+    "label_en": "Asked for family to be called",
+    "label_fr": "A demandé qu'on appelle la famille",
+    "category": "communication",
+    "suggested_statement": "She often asks for family to be called. Use the number on the fridge; it's fine to call more than once."
+  },
+  {
+    "code": "fell_or_nearly_fell",
+    "label_en": "Fell or nearly fell",
+    "label_fr": "Est tombée ou a presque chuté",
+    "category": "safety",
+    "suggested_statement": "She has had near-falls recently. Check the hallway rug and bathroom mat before helping her move."
+  },
+  {
+    "code": "bathroom_slippery",
+    "label_en": "Bathroom floor was wet or slippery",
+    "label_fr": "Le plancher de la salle de bain était glissant",
+    "category": "safety",
+    "suggested_statement": "The bathroom floor is often wet. Dry it before she goes in."
+  },
+  {
+    "code": "door_left_unlocked",
+    "label_en": "Front door found unlocked",
+    "label_fr": "Porte d'entrée trouvée déverrouillée",
+    "category": "safety",
+    "suggested_statement": "The front door has been found unlocked. Please check it is locked when you leave."
+  },
+  {
+    "code": "napped_during_visit",
+    "label_en": "Was asleep or napping",
+    "label_fr": "Dormait ou faisait une sieste",
+    "category": "routine",
+    "suggested_statement": "She is often asleep in the early afternoon. Afternoon visits go better after 3pm."
+  },
+  {
+    "code": "preferred_french",
+    "label_en": "Preferred to speak French",
+    "label_fr": "Préférait parler français",
+    "category": "communication",
+    "suggested_statement": "She switches to French when she is tired. Keep instructions short and in French."
+  },
+  {
+    "code": "uncomfortable_with_worker",
+    "label_en": "Seemed uncomfortable with the worker",
+    "label_fr": "Semblait mal à l'aise avec l'intervenant",
+    "category": "care",
+    "suggested_statement": "She is more at ease with a familiar worker for personal care. Please introduce yourself and explain each step."
+  },
+  {
+    "code": "stove_left_on",
+    "label_en": "Stove or kettle left on",
+    "label_fr": "Cuisinière ou bouilloire laissée allumée",
+    "category": "safety",
+    "suggested_statement": "The stove or kettle has been left on more than once. Check both before you leave."
+  },
+  {
+    "code": "good_day",
+    "label_en": "Alert and in good spirits",
+    "label_fr": "Alerte et de bonne humeur",
+    "category": "routine",
+    "suggested_statement": null
+  }
+]
