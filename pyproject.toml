@@ -1,7 +1,11 @@
 [project]
-name = "muslimhacksprojectelderycare"
-version = "0.1.0"
-description = "Add your description here"
+name = "eldercare"
+version = "0.2.0"
+description = "Consent-gated care briefs for elderly people receiving in-home care"
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = []
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+]

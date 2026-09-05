@@ -1,0 +1,32 @@
+{
+  "statements": [
+    { "id": 1, "statement": "Please have a female worker for bathing and dressing.", "category": "care", "applies_to_tasks": ["bathing", "dressing"], "excluded_tasks": [], "time_start": null, "time_end": null },
+    { "id": 2, "statement": "A male nurse is fine for blood draws and injections.", "category": "care", "applies_to_tasks": ["nursing_visit"], "excluded_tasks": [], "time_start": null, "time_end": null },
+    { "id": 3, "statement": "She prays between 1pm and 5pm. If she is on the prayer mat, wait.", "category": "observance", "applies_to_tasks": [], "excluded_tasks": [], "time_start": "13:00", "time_end": "17:00" },
+    { "id": 4, "statement": "Please take your shoes off at the door.", "category": "routine", "applies_to_tasks": [], "excluded_tasks": [], "time_start": null, "time_end": null },
+    { "id": 5, "statement": "She will say yes to everything to be polite. Check twice before you leave.", "category": "communication", "applies_to_tasks": [], "excluded_tasks": [], "time_start": null, "time_end": null },
+    { "id": 8, "statement": "Watch her actually swallow her medication.", "category": "safety", "applies_to_tasks": ["medication_support", "nursing_visit"], "excluded_tasks": [], "time_start": null, "time_end": null },
+    { "id": 13, "statement": "She gets dizzy standing up quickly.", "category": "safety", "applies_to_tasks": [], "excluded_tasks": [], "time_start": null, "time_end": null },
+    { "id": 14, "statement": "Keep the bathroom door unlocked when she is in there.", "category": "safety", "applies_to_tasks": ["bathing"], "excluded_tasks": [], "time_start": null, "time_end": null },
+    { "id": 17, "statement": "She naps after lunch, 1:30 to 3.", "category": "routine", "applies_to_tasks": [], "excluded_tasks": [], "time_start": "13:30", "time_end": "15:00" },
+    { "id": 18, "statement": "She likes the radio on in the mornings.", "category": "routine", "applies_to_tasks": ["companionship", "housekeeping", "meal"], "excluded_tasks": [], "time_start": "07:00", "time_end": "12:00" },
+    { "id": 24, "statement": "She wears a headscarf whenever anyone outside the family is in the house.", "category": "observance", "applies_to_tasks": ["bathing", "dressing", "companionship"], "excluded_tasks": [], "time_start": null, "time_end": null },
+    { "id": 40, "statement": "Never during a nursing visit: she does not want to discuss her finances.", "category": "communication", "applies_to_tasks": [], "excluded_tasks": ["nursing_visit"], "time_start": null, "time_end": null }
+  ],
+  "cases": [
+    {
+      "name": "10am bathing visit",
+      "visit": { "task_type": "bathing", "scheduled_start": "10:00", "scheduled_end": "11:00", "worker_role": "personal_support_worker", "worker_language": "fr" },
+      "expect_included": [1, 4, 5, 13, 14, 24, 40],
+      "expect_excluded": [2, 3, 8, 17, 18],
+      "expect_first_category": "safety"
+    },
+    {
+      "name": "4pm nursing visit",
+      "visit": { "task_type": "nursing_visit", "scheduled_start": "16:00", "scheduled_end": "16:45", "worker_role": "nurse", "worker_language": "fr" },
+      "expect_included": [2, 3, 4, 5, 8, 13],
+      "expect_excluded": [1, 14, 17, 18, 24, 40],
+      "expect_first_category": "safety"
+    }
+  ]
+}
