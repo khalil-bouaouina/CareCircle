@@ -99,3 +99,21 @@ CREATE TABLE IF NOT EXISTS access_log (
     target_summary  TEXT NOT NULL,
     at              TEXT NOT NULL
 );
+
+-- User accounts and elder circle relationships for real authentication
+CREATE TABLE IF NOT EXISTS user_account (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    email         TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    created_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_elder_link (
+    user_id       INTEGER NOT NULL REFERENCES user_account(id),
+    elder_id      INTEGER NOT NULL REFERENCES elder(id),
+    person_id     INTEGER REFERENCES person(id),
+    role          TEXT NOT NULL, -- primary_caregiver | family | elder
+    PRIMARY KEY (user_id, elder_id)
+);
+

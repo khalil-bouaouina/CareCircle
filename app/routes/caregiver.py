@@ -12,7 +12,7 @@ from .. import config
 from ..deps import Session_, caregiver_session, person_session
 from ..models import Purpose
 from ..repositories import checkouts, people, proposals, statements, visits
-from ..services import foldback, tokens, visibility
+from ..services import auth, foldback, tokens, visibility
 from ..web import templates
 from . import statement_out, visit_out
 
@@ -63,9 +63,15 @@ def record(request: Request, session: Session_ = Depends(person_session)):
     rows = visibility.resolve(session.elder.id, session.actor, Purpose())
     grouped = {c: [statement_out(s) for s in rows if s.category == c] for c in config.CATEGORIES}
     return templates.TemplateResponse(request=request, name="caregiver/record.html", context={
-        "elder": session.elder, "viewing_as": session.actor.label, "statements_by_category": grouped,
-        "categories": config.CATEGORIES, "task_types": config.TASK_TYPES,
+        "elder": session.elder,
+        "viewing_as": session.actor.label,
+        "statements_by_category": grouped,
+        "categories": config.CATEGORIES,
+        "task_types": config.TASK_TYPES,
         "people": [p for p in people.list_people(session.elder.id) if p.role != "worker"],
+        "user": session.user,
+        "user_elders": session.user_elders,
+        "current_role": session.role,
     })
 
 
@@ -84,12 +90,14 @@ def create_statement(
     for t in [*applies_to_tasks, *excluded_tasks]:
         _in(t, config.TASK_TYPES, "task")
     ts, te = _hhmm(time_start, "time_start"), _hhmm(time_end, "time_end")
+
     if (ts is None) != (te is None):
         raise HTTPException(422, "time_start and time_end must be set together")
     statements.create_statement(
         session.elder.id, statement.strip(), category, applies_to_tasks, excluded_tasks, ts, te, hidden_from
     )
     return RedirectResponse("/caregiver/record", status_code=303)
+
 
 
 @router.post("/statements/{statement_id}/visibility")
@@ -121,8 +129,14 @@ def list_visits(request: Request, session: Session_ = Depends(person_session)):
             "has_brief": visits.get_brief(v.id) is not None,
         })
     return templates.TemplateResponse(request=request, name="caregiver/visits.html", context={
-        "elder": session.elder, "visits": out, "task_types": config.TASK_TYPES,
+        "elder": session.elder,
+        "visits": out,
+        "task_types": config.TASK_TYPES,
+        "user": session.user,
+        "user_elders": session.user_elders,
+        "current_role": session.role,
     })
+
 
 
 @router.post("/visits", status_code=201)
@@ -164,6 +178,9 @@ def visit_created(visit_id: int, token: str, valid_from: str, valid_until: str, 
     })
 
 
+
+
+
 @router.get("/visits/{visit_id}")
 def get_visit(visit_id: int, session: Session_ = Depends(person_session)):
     tokens.expire_stale()
@@ -179,7 +196,12 @@ def get_visit(visit_id: int, session: Session_ = Depends(person_session)):
 @router.get("/proposals")
 def list_proposals(request: Request, status: str | None = "pending", session: Session_ = Depends(person_session)):
     return templates.TemplateResponse(request=request, name="caregiver/proposals.html", context={
-        "proposals": proposals.list_for_elder(session.elder.id, status or None), "categories": config.CATEGORIES,
+        "elder": session.elder,
+        "proposals": proposals.list_for_elder(session.elder.id, status or None),
+        "categories": config.CATEGORIES,
+        "user": session.user,
+        "user_elders": session.user_elders,
+        "current_role": session.role,
     })
 
 
@@ -205,3 +227,41 @@ def decide_proposal(
         return RedirectResponse("/caregiver/proposals", status_code=303)
     except foldback.NotAllowed as exc:
         raise HTTPException(403, exc.detail) from exc
+
+
+# --- elder & family circle management -----------------------------------------
+
+
+@router.post("/elders/new")
+def new_elder(
+    display_name: str = Form(min_length=2, max_length=120),
+    capacity_mode: str = Form(default="assisted"),
+    language: str = Form(default="fr"),
+    session: Session_ = Depends(caregiver_session),
+):
+    _in(capacity_mode, config.CAPACITY_MODES, "capacity_mode")
+    if not session.user:
+        raise HTTPException(400, "Compte utilisateur requis pour créer un dossier")
+    elder, _person = auth.create_elder_for_user(session.user.id, display_name, capacity_mode, language)
+    token = auth.create_session_token({
+        "user_id": session.user.id,
+        "active_elder_id": elder.id,
+        "role": "primary_caregiver",
+    })
+    resp = RedirectResponse("/caregiver/record", status_code=303)
+    resp.set_cookie(config.SESSION_COOKIE_NAME, token, httponly=True, samesite="lax", max_age=86400 * 30)
+    return resp
+
+
+@router.post("/people/invite")
+def invite_person(
+    name: str = Form(min_length=2, max_length=120),
+    email: str = Form(...),
+    password: str = Form(min_length=6),
+    role: str = Form(default="family"),
+    session: Session_ = Depends(caregiver_session),
+):
+    _in(role, ["family", "primary_caregiver", "elder"], "role")
+    auth.add_family_member(session.elder.id, name, email, password, role)
+
+    return RedirectResponse("/caregiver/record", status_code=303)

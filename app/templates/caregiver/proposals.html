@@ -2,6 +2,18 @@
 {% set layout = "console" %}
 {% block title %}Propositions — CareCircle{% endblock %}
 {% block content %}
-  <header><p class="eyebrow">CareCircle · Espace aidant</p><h1>Propositions</h1><nav aria-label="Console aidant"><a href="/caregiver/record">Dossier</a> <a href="/caregiver/visits">Visites</a> <a href="/caregiver/proposals">Propositions</a></nav></header>
+  <header>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:0.5rem;">
+      <p class="eyebrow" style="margin:0;">CareCircle · Espace aidant</p>
+      {% if user %}
+        <div class="user-status" style="display:flex; align-items:center; gap:0.75rem; font-size:0.9rem;">
+          <span>Connecté : <strong>{{ user.name }}</strong> ({{ current_role }})</span>
+          <a href="/logout" style="color:#ef4444; font-weight:600; text-decoration:none;">Déconnexion</a>
+        </div>
+      {% endif %}
+    </div>
+    <h1>Propositions pour {{ elder.display_name }}</h1>
+    <nav aria-label="Console aidant"><a href="/caregiver/record">Dossier</a> <a href="/caregiver/visits">Visites</a> <a href="/caregiver/proposals">Propositions</a></nav>
+  </header>
   {% for proposal in proposals %}<article><p>« {{ proposal.suggested_statement }} »</p><p>Cette proposition provient d’observations structurées répétées.</p><form method="post" action="/caregiver/proposals/{{ proposal.id }}/decide"><input type="hidden" name="decision" value="approve"><label>Catégorie <select name="category">{% for category in categories %}<option value="{{ category }}">{{ category }}</option>{% endfor %}</select></label><button type="submit">Ajouter au dossier</button></form><form method="post" action="/caregiver/proposals/{{ proposal.id }}/decide"><input type="hidden" name="decision" value="reject"><button class="secondary" type="submit">Ignorer</button></form></article>{% else %}<p class="empty-state">Rien en attente. Les propositions apparaissent lorsque des observations semblent durables.</p>{% endfor %}
 {% endblock %}

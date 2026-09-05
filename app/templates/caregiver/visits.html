@@ -6,7 +6,19 @@
 {%- endmacro %}
 {% block title %}Visites — CareCircle{% endblock %}
 {% block content %}
-  <header><p class="eyebrow">CareCircle · Espace aidant</p><h1>Visites de {{ elder.display_name }}</h1><nav aria-label="Console aidant"><a href="/caregiver/record">Dossier</a> <a href="/caregiver/visits">Visites</a> <a href="/caregiver/proposals">Propositions</a></nav></header>
+  <header>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:0.5rem;">
+      <p class="eyebrow" style="margin:0;">CareCircle · Espace aidant</p>
+      {% if user %}
+        <div class="user-status" style="display:flex; align-items:center; gap:0.75rem; font-size:0.9rem;">
+          <span>Connecté : <strong>{{ user.name }}</strong> ({{ current_role }})</span>
+          <a href="/logout" style="color:#ef4444; font-weight:600; text-decoration:none;">Déconnexion</a>
+        </div>
+      {% endif %}
+    </div>
+    <h1>Visites de {{ elder.display_name }}</h1>
+    <nav aria-label="Console aidant"><a href="/caregiver/record">Dossier</a> <a href="/caregiver/visits">Visites</a> <a href="/caregiver/proposals">Propositions</a></nav>
+  </header>
   <section><h2>Créer une visite</h2>
     <form method="post" action="/caregiver/visits">
       <p><label>Nom de l’intervenant <input name="worker_name" required></label></p>

@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% set layout = "public" %}
+{% block title %}Créer un compte — CareCircle{% endblock %}
+{% block content %}
+<div class="auth-container">
+  <header>
+    <p class="eyebrow" id="header-eyebrow">Nouveau compte</p>
+    <h1 id="header-title">Bienvenue sur CareCircle</h1>
+    <p id="header-subtitle">Créez votre compte pour coordonner les soins et préserver vos préférences et votre dignité.</p>
+  </header>
+
+  {% if error %}
+    <div class="alert alert-danger" role="alert" style="background:#fee2e2; border-left:4px solid #ef4444; color:#991b1b; padding:1rem; border-radius:8px; margin-bottom:1.5rem;">
+      <p style="margin:0; font-weight:600;">{{ error }}</p>
+    </div>
+  {% endif %}
+
+  <section class="card" style="background:var(--card-bg, #fff); border:1px solid var(--border-subtle, #e5e7eb); border-radius:12px; padding:2rem; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom:2rem;">
+    <!-- Sélecteur de rôle d'inscription -->
+    <div style="background:#f1f5f9; padding:0.4rem; border-radius:10px; display:flex; gap:0.5rem; margin-bottom:1.75rem;">
+      <label id="label-caregiver" style="flex:1; text-align:center; padding:0.75rem 1rem; border-radius:8px; font-weight:600; cursor:pointer; background:#fff; color:var(--navy, #03224C); box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <input type="radio" name="role_selector" value="caregiver" checked onchange="toggleAccountType('caregiver')" style="margin-right:0.4rem;">
+        Je suis un proche aidant
+      </label>
+      <label id="label-elder" style="flex:1; text-align:center; padding:0.75rem 1rem; border-radius:8px; font-weight:600; cursor:pointer; background:transparent; color:#64748b;">
+        <input type="radio" name="role_selector" value="elder" onchange="toggleAccountType('elder')" style="margin-right:0.4rem;">
+        Je suis la personne aidée (Senior)
+      </label>
+    </div>
+
+    <form method="post" action="/register" style="display:flex; flex-direction:column; gap:1.5rem;">
+      <input type="hidden" id="account_type" name="account_type" value="{{ account_type | default('caregiver') }}">
+
+      <fieldset style="border:none; padding:0; margin:0; display:flex; flex-direction:column; gap:1rem;">
+        <legend id="legend-personal" style="font-size:1.1rem; font-weight:700; color:var(--text-heading, #03224C); border-bottom:1px solid #e2e8f0; padding-bottom:0.5rem; margin-bottom:0.5rem; width:100%;">
+          1. Vos informations personnelles
+        </legend>
+
+        <div>
+          <label for="name" id="name-label" style="display:block; font-weight:600; margin-bottom:0.4rem;">Votre nom complet</label>
+          <input type="text" id="name" name="name" value="{{ name | default('') }}" required placeholder="ex. Sarah Benali" style="width:100%; padding:0.75rem; border:1px solid #cbd5e1; border-radius:8px; font-size:1rem;">
+        </div>
+
+        <div>
+          <label for="email" style="display:block; font-weight:600; margin-bottom:0.4rem;">Adresse email de connexion</label>
+          <input type="email" id="email" name="email" value="{{ email | default('') }}" required placeholder="ex. vous@exemple.com" style="width:100%; padding:0.75rem; border:1px solid #cbd5e1; border-radius:8px; font-size:1rem;">
+        </div>
+
+        <div>
+          <label for="password" style="display:block; font-weight:600; margin-bottom:0.4rem;">Mot de passe (6 caractères minimum)</label>
+          <input type="password" id="password" name="password" minlength="6" required placeholder="••••••••" style="width:100%; padding:0.75rem; border:1px solid #cbd5e1; border-radius:8px; font-size:1rem;">
+        </div>
+      </fieldset>
+
+      <!-- Section Proche Aidé (visible pour l'aidant) -->
+      <fieldset id="fieldset-elder" style="border:none; padding:0; margin:0; display:flex; flex-direction:column; gap:1rem;">
+        <legend style="font-size:1.1rem; font-weight:700; color:var(--text-heading, #03224C); border-bottom:1px solid #e2e8f0; padding-bottom:0.5rem; margin-bottom:0.5rem; width:100%;">
+          2. La personne aidée
+        </legend>
+
+        <div>
+          <label for="elder_name" style="display:block; font-weight:600; margin-bottom:0.4rem;">Prénom et nom de la personne aidée</label>
+          <input type="text" id="elder_name" name="elder_name" value="{{ elder_name | default('') }}" placeholder="ex. Fatima B." style="width:100%; padding:0.75rem; border:1px solid #cbd5e1; border-radius:8px; font-size:1rem;">
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div>
+            <label for="capacity_mode" style="display:block; font-weight:600; margin-bottom:0.4rem;">Prise de décision</label>
+            <select id="capacity_mode" name="capacity_mode" style="width:100%; padding:0.75rem; border:1px solid #cbd5e1; border-radius:8px; font-size:1rem; background:#fff;">
+              <option value="assisted" selected>Assistée (l’aidant et le proche collaborent)</option>
+              <option value="self">Autonome (l’aîné décide seul)</option>
+              <option value="mandated">Sous mandat / Tutelle (l’aidant décide)</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="language" style="display:block; font-weight:600; margin-bottom:0.4rem;">Langue principale</label>
+            <select id="language" name="language" style="width:100%; padding:0.75rem; border:1px solid #cbd5e1; border-radius:8px; font-size:1rem; background:#fff;">
+              <option value="fr" selected>Français</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+
+      <button type="submit" id="btn-submit" class="btn btn-primary" style="background:var(--navy, #03224C); color:#fff; padding:0.85rem 1.5rem; border:none; border-radius:8px; font-size:1rem; font-weight:600; cursor:pointer; margin-top:0.5rem;">
+        Créer mon compte et mon cercle de soins
+      </button>
+    </form>
+
+    <div style="margin-top:1.5rem; text-align:center; font-size:0.95rem; border-top:1px solid #f1f5f9; padding-top:1.25rem;">
+      <span>Vous avez déjà un compte ? </span>
+      <a href="/login" style="color:var(--navy, #03224C); font-weight:600; text-decoration:underline;">Se connecter</a>
+    </div>
+  </section>
+</div>
+
+<script>
+function toggleAccountType(type) {
+  document.getElementById('account_type').value = type;
+  const fieldsetElder = document.getElementById('fieldset-elder');
+  const elderNameInput = document.getElementById('elder_name');
+  const btnSubmit = document.getElementById('btn-submit');
+  const labelCaregiver = document.getElementById('label-caregiver');
+  const labelElder = document.getElementById('label-elder');
+
+  if (type === 'elder') {
+    fieldsetElder.style.display = 'none';
+    elderNameInput.removeAttribute('required');
+    btnSubmit.textContent = "Créer mon espace aîné";
+    labelElder.style.background = '#fff';
+    labelElder.style.color = 'var(--navy, #03224C)';
+    labelElder.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    labelCaregiver.style.background = 'transparent';
+    labelCaregiver.style.color = '#64748b';
+    labelCaregiver.style.boxShadow = 'none';
+  } else {
+    fieldsetElder.style.display = 'flex';
+    elderNameInput.setAttribute('required', 'required');
+    btnSubmit.textContent = "Créer mon compte et mon cercle de soins";
+    labelCaregiver.style.background = '#fff';
+    labelCaregiver.style.color = 'var(--navy, #03224C)';
+    labelCaregiver.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    labelElder.style.background = 'transparent';
+    labelElder.style.color = '#64748b';
+    labelElder.style.boxShadow = 'none';
+  }
+}
+
+// Initialise state if redirected with error
+if (document.getElementById('account_type').value === 'elder') {
+  document.querySelector('input[name="role_selector"][value="elder"]').checked = true;
+  toggleAccountType('elder');
+}
+</script>
+{% endblock %}

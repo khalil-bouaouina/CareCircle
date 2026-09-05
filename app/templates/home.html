@@ -1,15 +1,88 @@
 {% extends "base.html" %}
 {% set layout = "public" %}
-{% block title %}CareCircle — Démonstration{% endblock %}
+{% block title %}CareCircle — Coordination des soins et dignité des aînés{% endblock %}
 {% block content %}
-  <header>
-    <p class="eyebrow">Coordination des soins</p>
-    <h1>CareCircle</h1>
-    <p>Choisissez une vue de démonstration.</p>
+<div class="landing-container">
+  <header style="text-align:center; max-width:760px; margin:0 auto 3rem;">
+    <p class="eyebrow" style="color:var(--navy, #03224C); font-weight:700; letter-spacing:0.05em; text-transform:uppercase; font-size:0.85rem;">Coordination des soins à domicile</p>
+    <h1 style="font-size:2.6rem; font-weight:800; color:var(--text-heading, #03224C); line-height:1.2; margin:0.5rem 0 1rem;">CareCircle</h1>
+    <p style="font-size:1.2rem; color:var(--text-muted, #5b6473); line-height:1.6;">
+      La plateforme qui protège la dignité, les habitudes et l’intimité des personnes âgées tout en guidant chaque auxiliaire de vie avec clarté.
+    </p>
+
+    {% if user %}
+      <div class="user-banner" style="background:#eef2f8; border:1px solid #cbd5e1; border-radius:12px; padding:1.25rem; margin-top:2rem; display:inline-block; text-align:left;">
+        <p style="margin:0 0 0.5rem; font-size:1rem; color:#1e293b;">
+          👋 Connecté en tant que <strong>{{ user.name }}</strong> ({{ user.email }})
+        </p>
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.75rem;">
+          {% if role == "elder" %}
+            <a href="/elder" class="btn btn-primary" style="background:var(--navy, #03224C); color:#fff; padding:0.6rem 1.25rem; border-radius:8px; text-decoration:none; font-weight:600;">Accéder à mon espace aîné</a>
+          {% else %}
+            <a href="/caregiver/record" class="btn btn-primary" style="background:var(--navy, #03224C); color:#fff; padding:0.6rem 1.25rem; border-radius:8px; text-decoration:none; font-weight:600;">Accéder à l'espace aidant</a>
+          {% endif %}
+          <a href="/logout" class="btn btn-secondary" style="background:#fff; border:1px solid #cbd5e1; color:#334155; padding:0.6rem 1.25rem; border-radius:8px; text-decoration:none; font-weight:500;">Se déconnecter</a>
+        </div>
+      </div>
+    {% else %}
+      <div class="cta-actions" style="display:flex; justify-content:center; gap:1rem; margin-top:2rem; flex-wrap:wrap;">
+        <a href="/login" class="btn btn-primary" style="background:var(--navy, #03224C); color:#fff; padding:0.85rem 1.75rem; border-radius:8px; text-decoration:none; font-weight:600; font-size:1.05rem;">
+          Se connecter
+        </a>
+        <a href="/register" class="btn btn-secondary" style="background:#fff; border:2px solid var(--navy, #03224C); color:var(--navy, #03224C); padding:0.85rem 1.75rem; border-radius:8px; text-decoration:none; font-weight:600; font-size:1.05rem;">
+          Créer un compte aidant
+        </a>
+      </div>
+    {% endif %}
   </header>
-  <nav class="role-picker" aria-label="Choisir une vue de démonstration">
-    <a href="/caregiver">Console de l’aidant</a>
-    <a href="/elder">Vue de la personne aidée</a>
-    {% if worker_link %}<a href="{{ worker_link }}">Lien intervenant</a>{% else %}<p>Le lien intervenant est affiché immédiatement après la création d’une visite.</p>{% endif %}
-  </nav>
+
+  <!-- 3 Piliers du produit -->
+  <section class="features-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1.5rem; margin-bottom:3.5rem;">
+    <article class="card" style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.5rem; box-shadow:0 2px 4px rgba(0,0,0,0.04);">
+      <div style="font-size:1.8rem; margin-bottom:0.75rem;">🛡️</div>
+      <h3 style="color:var(--navy, #03224C); margin-top:0; font-size:1.2rem;">Consentement et Confidentialité</h3>
+      <p style="color:#64748b; font-size:0.95rem; line-height:1.5;">
+        Chaque habitude ou besoin intime est filtré selon qui intervient, la tâche prévue et l’horaire. Les données masquées ne quittent jamais la base de données.
+      </p>
+    </article>
+
+    <article class="card" style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.5rem; box-shadow:0 2px 4px rgba(0,0,0,0.04);">
+      <div style="font-size:1.8rem; margin-bottom:0.75rem;">📱</div>
+      <h3 style="color:var(--navy, #03224C); margin-top:0; font-size:1.2rem;">Accès Intervenant Sans Compte</h3>
+      <p style="color:#64748b; font-size:0.95rem; line-height:1.5;">
+        L'auxiliaire de vie reçoit un lien sécurisé à usage unique valable uniquement pendant sa visite. Aucun compte ni mot de passe n’est requis.
+      </p>
+    </article>
+
+    <article class="card" style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.5rem; box-shadow:0 2px 4px rgba(0,0,0,0.04);">
+      <div style="font-size:1.8rem; margin-bottom:0.75rem;">👁️</div>
+      <h3 style="color:var(--navy, #03224C); margin-top:0; font-size:1.2rem;">Transparence Totale pour l'Aîné</h3>
+      <p style="color:#64748b; font-size:0.95rem; line-height:1.5;">
+        Interface accessible et à grands caractères. L’aîné garde le contrôle et peut consulter à tout moment son journal d’accès immuable.
+      </p>
+    </article>
+  </section>
+
+  <!-- Accès rapides aux démonstrations directes -->
+  <section class="portal-picker" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:2rem; text-align:center;">
+    <h2 style="font-size:1.3rem; color:var(--text-heading, #03224C); margin-top:0;">Espaces de démonstration & Rôles</h2>
+    <p style="color:#64748b; font-size:0.95rem; max-width:600px; margin:0 auto 1.5rem;">
+      Vous pouvez également explorer directement les trois interfaces dédiées :
+    </p>
+
+    <div style="display:flex; justify-content:center; gap:1rem; flex-wrap:wrap;">
+      <a href="/caregiver" class="btn" style="background:#fff; border:1px solid #cbd5e1; color:var(--navy, #03224C); padding:0.75rem 1.25rem; border-radius:8px; text-decoration:none; font-weight:600;">
+        Console de l’aidant
+      </a>
+      <a href="/elder" class="btn" style="background:#fff; border:1px solid #cbd5e1; color:var(--navy, #03224C); padding:0.75rem 1.25rem; border-radius:8px; text-decoration:none; font-weight:600;">
+        Vue de la personne aidée
+      </a>
+      {% if worker_link %}
+        <a href="{{ worker_link }}" class="btn" style="background:#047857; color:#fff; padding:0.75rem 1.25rem; border-radius:8px; text-decoration:none; font-weight:600;">
+          Lien intervenant (Visite active)
+        </a>
+      {% endif %}
+    </div>
+  </section>
+</div>
 {% endblock %}

@@ -146,6 +146,23 @@ class AccessEntry(_Row):
     at: str
 
 
+@dataclass(frozen=True)
+class UserAccount(_Row):
+    id: int
+    email: str
+    password_hash: str
+    name: str
+    created_at: str
+
+
+@dataclass(frozen=True)
+class UserElderLink(_Row):
+    user_id: int
+    elder_id: int
+    person_id: int | None
+    role: str  # primary_caregiver | family | elder
+
+
 # --- not tables ---------------------------------------------------------------
 
 

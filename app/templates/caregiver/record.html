@@ -8,11 +8,37 @@
 {% block title %}Dossier — CareCircle{% endblock %}
 {% block content %}
   <header>
-    <p class="eyebrow">CareCircle · Espace aidant</p>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:0.5rem;">
+      <p class="eyebrow" style="margin:0;">CareCircle · Espace aidant</p>
+      {% if user %}
+        <div class="user-status" style="display:flex; align-items:center; gap:0.75rem; font-size:0.9rem;">
+          <span>Connecté : <strong>{{ user.name }}</strong> ({{ current_role }})</span>
+          <a href="/logout" style="color:#ef4444; font-weight:600; text-decoration:none;">Déconnexion</a>
+        </div>
+      {% endif %}
+    </div>
+
     <h1>Dossier de {{ elder.display_name }}</h1>
     <p>Mode de décision : {{ elder.capacity_mode }}</p>
+
+    {% if user_elders and user_elders|length > 1 %}
+      <div style="margin: 0.75rem 0; padding: 0.5rem 0.75rem; background: #eef2f8; border-radius: 8px; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+        <span style="font-weight: 600; font-size: 0.9rem;">Changer de dossier :</span>
+        {% for el, link in user_elders %}
+          {% if el.id != elder.id %}
+            <form method="post" action="/switch-elder/{{ el.id }}" style="display:inline;">
+              <button type="submit" style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:0.3rem 0.6rem; cursor:pointer; font-size:0.85rem;">
+                Voir dossier {{ el.display_name }}
+              </button>
+            </form>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
+
     <nav aria-label="Console aidant"><a href="/caregiver/record">Dossier</a> <a href="/caregiver/visits">Visites</a> <a href="/caregiver/proposals">Propositions</a></nav>
   </header>
+
   {% for category in categories %}
     <section>
       <h2>{{ category }}</h2>
@@ -33,6 +59,7 @@
       {% else %}<p>Aucune préférence dans cette catégorie.</p>{% endfor %}
     </section>
   {% endfor %}
+
   <details>
     <summary>Ajouter une préférence</summary>
     <form method="post" action="/caregiver/statements">
@@ -45,4 +72,58 @@
       <button type="submit">Ajouter la préférence</button>
     </form>
   </details>
+
+  <!-- Gestion du cercle de soins et nouveaux profils -->
+  <hr style="margin: 2.5rem 0; border: none; border-top: 1px solid #e2e8f0;">
+
+  <section class="circle-management" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1.5rem;">
+    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:1.25rem;">
+      <h3 style="margin-top:0; font-size:1.05rem;">👥 Membres du cercle</h3>
+      <ul style="padding-left:1.25rem; font-size:0.95rem; margin-bottom:1rem;">
+        {% for p in people %}
+          <li><strong>{{ p.name }}</strong> ({{ p.role }})</li>
+        {% endfor %}
+      </ul>
+
+      <details>
+        <summary style="font-size:0.9rem; font-weight:600; cursor:pointer;">+ Inviter un proche</summary>
+        <form method="post" action="/caregiver/people/invite" style="margin-top:0.75rem; display:flex; flex-direction:column; gap:0.5rem;">
+          <input type="text" name="name" required placeholder="Nom du proche" style="padding:0.4rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;">
+          <input type="email" name="email" required placeholder="Email de connexion" style="padding:0.4rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;">
+          <input type="password" name="password" required minlength="6" placeholder="Mot de passe temporaire" style="padding:0.4rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;">
+          <select name="role" style="padding:0.4rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;">
+            <option value="family">Famille (vue restreinte)</option>
+            <option value="primary_caregiver">Co-aidant principal (droits complets)</option>
+            <option value="elder">L'aîné lui-même (accès personnel tablette/ordinateur)</option>
+          </select>
+
+          <button type="submit" style="background:var(--navy, #03224C); color:#fff; border:none; border-radius:6px; padding:0.5rem; cursor:pointer; font-weight:600; font-size:0.85rem;">
+            Ajouter au cercle
+          </button>
+        </form>
+      </details>
+    </div>
+
+    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:1.25rem;">
+      <h3 style="margin-top:0; font-size:1.05rem;">🏠 Ajouter un autre proche aidé</h3>
+      <p style="font-size:0.85rem; color:#64748b; margin-bottom:0.75rem;">
+        Vous accompagnez une autre personne ? Créez un nouveau dossier indépendant pour elle.
+      </p>
+
+      <details>
+        <summary style="font-size:0.9rem; font-weight:600; cursor:pointer;">+ Créer un nouveau dossier</summary>
+        <form method="post" action="/caregiver/elders/new" style="margin-top:0.75rem; display:flex; flex-direction:column; gap:0.5rem;">
+          <input type="text" name="display_name" required placeholder="Prénom et nom du proche" style="padding:0.4rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;">
+          <select name="capacity_mode" style="padding:0.4rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;">
+            <option value="assisted">Prise de décision assistée</option>
+            <option value="self">Prise de décision autonome</option>
+            <option value="mandated">Sous mandat / Tutelle</option>
+          </select>
+          <button type="submit" style="background:var(--navy, #03224C); color:#fff; border:none; border-radius:6px; padding:0.5rem; cursor:pointer; font-weight:600; font-size:0.85rem;">
+            Créer et basculer sur ce dossier
+          </button>
+        </form>
+      </details>
+    </div>
+  </section>
 {% endblock %}

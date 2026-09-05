@@ -23,7 +23,10 @@ def my_record(request: Request, session: Session_ = Depends(elder_session)):
     rows = visibility.resolve(session.elder.id, session.actor, Purpose())
     everyone = [p.to_dict() for p in people.list_people(session.elder.id) if p.role != "worker"]
     return templates.TemplateResponse(request=request, name="elder/record.html", context={
-        "elder": session.elder, "people": everyone, "statements": [statement_out(s) for s in rows],
+        "elder": session.elder,
+        "people": everyone,
+        "statements": [statement_out(s) for s in rows],
+        "user": session.user,
     })
 
 
@@ -49,7 +52,9 @@ def set_visibility(
 def my_access_log(request: Request, limit: int = 50, session: Session_ = Depends(elder_session)):
     entries = access_log.list_access(session.elder.id, limit=limit)
     return templates.TemplateResponse(request=request, name="elder/access_log.html", context={
+        "elder": session.elder,
         "entries": [format_access_sentence(entry) for entry in entries],
+        "user": session.user,
     })
 
 
@@ -58,7 +63,10 @@ def my_proposals(request: Request, session: Session_ = Depends(elder_session)):
     """The UI shows one at a time; ``first`` is the one to render, ``pending`` the rest."""
     pending = [proposal_out(p) for p in proposals.list_pending(session.elder.id)]
     return templates.TemplateResponse(request=request, name="elder/proposals.html", context={
-        "proposal": pending[0] if pending else None, "categories": config.CATEGORIES,
+        "elder": session.elder,
+        "proposal": pending[0] if pending else None,
+        "categories": config.CATEGORIES,
+        "user": session.user,
     })
 
 
@@ -103,6 +111,7 @@ def _when(at: datetime, today: date | None = None) -> str:
     clock = f"{at.hour}:{at.minute:02d}"
     if at.date() == today:
         return f"at {clock} today"
+
     if (today - at.date()).days == 1:
         return f"yesterday at {clock}"
     if (today - at.date()).days < 7:

@@ -17,8 +17,9 @@ from pathlib import Path
 
 from . import config
 from .db import drop_db, init_db, query_one
-from .repositories import checkouts, observation_codes, people, proposals, statements, visits
-from .services import tokens
+from .repositories import accounts, checkouts, observation_codes, people, proposals, statements, visits
+from .services import auth, tokens
+
 
 
 def _read(path: Path):
@@ -31,13 +32,27 @@ def is_seeded() -> bool:
     return bool(row and row["n"] > 0)
 
 
+def seed_demo_users_if_missing(elder_id: int = 1) -> None:
+    if accounts.get_user_by_email("sarah@carecircle.demo") is None:
+        demo_users = [
+            ("sarah@carecircle.demo", "Sarah B.", "primary_caregiver", 1, elder_id),
+            ("karim@carecircle.demo", "Karim B.", "family", 2, elder_id),
+            ("fatima@carecircle.demo", "Fatima B.", "elder", None, elder_id),
+        ]
+        for email, name, role, person_id, e_id in demo_users:
+            uid = accounts.create_user(email, auth.hash_password("demo1234"), name)
+            accounts.link_user_to_elder(uid, e_id, person_id, role)
+
+
 def seed(reset: bool = False, data_dir: Path | None = None) -> bool:
     """Seed if empty. With ``reset`` delete the database file first. Returns True if seeded."""
     if reset:
         drop_db()
         init_db()
     elif is_seeded():
+        seed_demo_users_if_missing()
         return False
+
 
     data_dir = data_dir or config.DATA_DIR
     data = _read(data_dir / "seed_data.json")
@@ -82,4 +97,16 @@ def seed(reset: bool = False, data_dir: Path | None = None) -> bool:
             p["elder_id"], p.get("source_checkout_id"), p["suggested_statement"],
             status=p.get("status", "pending"), proposal_id=p["id"],
         )
+
+    # Seed user accounts for authentication
+    demo_users = [
+        ("sarah@carecircle.demo", "Sarah B.", "primary_caregiver", 1, e["id"]),
+        ("karim@carecircle.demo", "Karim B.", "family", 2, e["id"]),
+        ("fatima@carecircle.demo", "Fatima B.", "elder", None, e["id"]),
+    ]
+    for email, name, role, person_id, elder_id in demo_users:
+        uid = accounts.create_user(email, auth.hash_password("demo1234"), name)
+        accounts.link_user_to_elder(uid, elder_id, person_id, role)
+
     return True
+
