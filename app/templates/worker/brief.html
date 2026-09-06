@@ -10,7 +10,7 @@
         {% if result.is_first_visit %}
           First visit · {{ result.note_count }} notes from {{ result.contributor_count }} previous workers
         {% else %}
-          Your {{ visit_ordinal }} visit ·
+          {%- if visit_ordinal %}Your {{ visit_ordinal }} visit{% else %}Visit{% endif %} ·
           {%- if result.changed_count == 0 %} nothing has changed
           {%- else %} {{ result.changed_count }} thing{{ 's' if result.changed_count != 1 }} ha{{ 's' if result.changed_count == 1 else 've' }} changed{% endif %}
         {% endif %}

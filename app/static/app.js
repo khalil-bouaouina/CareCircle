@@ -13,7 +13,7 @@ function copyLink(elementId) {
     const button = document.querySelector('[data-copy-for="' + elementId + '"]');
     if (!button) return;
     const original = button.textContent;
-    button.textContent = 'Copié';
+    button.textContent = 'Copied';
     setTimeout(() => { button.textContent = original; }, 2000);
   });
 }

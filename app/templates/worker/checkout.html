@@ -8,10 +8,10 @@
       <legend class="font-medium mb-2">Did the task happen?</legend>
       <div class="grid grid-cols-3 gap-2">
         {% for c in completions %}
-          <label>
+          <label class="cursor-pointer">
             <input type="radio" name="completion" value="{{ c }}" class="peer sr-only"
                    {% if loop.first %}required{% endif %}>
-            <span class="block text-center border rounded-lg py-3 peer-checked:bg-gray-900 peer-checked:text-white">
+            <span class="block text-center border rounded-lg py-3 peer-checked:bg-gray-900 peer-checked:text-white transition-colors select-none">
               {{ {'yes': 'Yes', 'partial': 'Partly', 'no': 'No'}[c] }}
             </span>
           </label>
@@ -23,9 +23,9 @@
       <legend class="font-medium mb-2">Anything you noticed?</legend>
       <div class="grid grid-cols-2 gap-2">
         {% for code, label in observation_codes %}
-          <label>
+          <label class="cursor-pointer">
             <input type="checkbox" name="observation_codes" value="{{ code }}" class="peer sr-only">
-            <span class="block text-center text-base border rounded-lg py-3 px-2 peer-checked:bg-gray-900 peer-checked:text-white">
+            <span class="block text-center text-base border rounded-lg py-3 px-2 peer-checked:bg-gray-900 peer-checked:text-white transition-colors select-none">
               {{ label }}
             </span>
           </label>
