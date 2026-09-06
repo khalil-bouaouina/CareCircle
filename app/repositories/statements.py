@@ -1,6 +1,10 @@
-"""preference_statement. READS of statement data for any surface go through
-``services.visibility.resolve``; the list function here is its data source and
-must not be called from a route."""
+"""preference_statement (B8).
+
+READS of statement data for any surface go through ``services.visibility.resolve``;
+``list_statements`` is its data source and must not be called from a route.
+
+Every write path sets ``updated_at``. The delta brief is only as good as this field.
+"""
 
 from __future__ import annotations
 
@@ -17,36 +21,35 @@ def _row(row: dict | None) -> Statement | None:
 def create_statement(
     elder_id: int,
     statement: str,
+    kind: str,
     category: str,
-    applies_to_tasks: list[str],
-    excluded_tasks: list[str],
-    time_start: str | None,
-    time_end: str | None,
+    source: str,
+    applies_to_tasks: list[str] | None = None,
+    excluded_tasks: list[str] | None = None,
+    time_start: str | None = None,
+    time_end: str | None = None,
     hidden_from: list[int] | None = None,
     status: str = "active",
+    origin_visit_id: int | None = None,
     source_checkout_id: int | None = None,
+    confirmations: int = 0,
     statement_id: int | None = None,
+    created_at: str | None = None,
+    updated_at: str | None = None,
 ) -> int:
-    now = now_iso()
+    created = created_at or now_iso()
+    updated = updated_at or created
     return execute(
         """INSERT INTO preference_statement
-           (id, elder_id, statement, category, applies_to_tasks, excluded_tasks,
-            time_start, time_end, hidden_from, status, source_checkout_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           (id, elder_id, statement, kind, category, source,
+            applies_to_tasks, excluded_tasks, time_start, time_end, hidden_from,
+            status, origin_visit_id, confirmations, source_checkout_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            statement_id,
-            elder_id,
-            statement,
-            category,
-            _dump(applies_to_tasks),
-            _dump(excluded_tasks),
-            time_start,
-            time_end,
+            statement_id, elder_id, statement, kind, category, source,
+            _dump(applies_to_tasks), _dump(excluded_tasks), time_start, time_end,
             _dump(sorted(set(hidden_from or []))),
-            status,
-            source_checkout_id,
-            now,
-            now,
+            status, origin_visit_id, confirmations, source_checkout_id, created, updated,
         ),
     )
 
@@ -55,13 +58,14 @@ def get_statement(statement_id: int) -> Statement | None:
     return _row(query_one("SELECT * FROM preference_statement WHERE id = ?", (statement_id,)))
 
 
-def list_statements(elder_id: int, status: str = "active") -> list[Statement]:
-    """Ordered by category, then id, so pages are stable."""
-    rows = query(
-        "SELECT * FROM preference_statement WHERE elder_id = ? AND status = ? ORDER BY category, id",
-        (elder_id, status),
-    )
-    return [_row(r) for r in rows]
+def list_statements(elder_id: int, status: str = "active", kind: str | None = None) -> list[Statement]:
+    """Ordered by category, then id, so pages are stable between loads."""
+    sql = "SELECT * FROM preference_statement WHERE elder_id = ? AND status = ?"
+    params: tuple = (elder_id, status)
+    if kind is not None:
+        sql += " AND kind = ?"
+        params += (kind,)
+    return [_row(r) for r in query(sql + " ORDER BY category, id", params)]
 
 
 def set_hidden_from(statement_id: int, person_ids: list[int]) -> None:
@@ -78,8 +82,15 @@ def set_status(statement_id: int, status: str) -> None:
     )
 
 
+def increment_confirmations(statement_id: int) -> None:
+    execute(
+        "UPDATE preference_statement SET confirmations = confirmations + 1, updated_at = ? WHERE id = ?",
+        (now_iso(), statement_id),
+    )
+
+
 def count_active(elder_id: int) -> int:
-    """Exists solely for the "6 of 31 notes" footer."""
+    """Exists solely for the continuity counter, and earns its place there."""
     row = query_one(
         "SELECT COUNT(*) AS n FROM preference_statement WHERE elder_id = ? AND status = 'active'",
         (elder_id,),

@@ -1,125 +1,102 @@
-"""Elder view (B16). Her own record, large type in the UI, plain sentences in the log."""
+"""Elder view (B19). Her own record, and the access log in plain sentences."""
 
 from __future__ import annotations
 
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 
-from .. import config
-from ..deps import Session_, elder_session
-from ..models import AccessEntry, Purpose
-from ..repositories import access_log, people, proposals, statements
+from ..models import Actor, AccessEntry, Purpose
+from ..repositories import access_log, people, proposals, statements, visits, workers
 from ..services import foldback, visibility
 from ..web import templates
-from . import proposal_out, statement_out
+from . import ELDER_ID
 
 router = APIRouter(prefix="/elder", tags=["elder"])
 
 
+def _elder_actor() -> Actor:
+    elder = people.get_elder(ELDER_ID)
+    return Actor(kind="elder", person_id=None, label=elder.first_name if elder else "Elder")
+
+
 @router.get("")
-def my_record(request: Request, session: Session_ = Depends(elder_session)):
-    rows = visibility.resolve(session.elder.id, session.actor, Purpose())
-    everyone = [p.to_dict() for p in people.list_people(session.elder.id) if p.role != "worker"]
+def my_record(request: Request):
+    rows = visibility.resolve(ELDER_ID, _elder_actor(), Purpose())
+    authors = {}
+    for s in rows:
+        if s.origin_visit_id:
+            visit = visits.get_visit(s.origin_visit_id)
+            worker = workers.get_worker(visit.worker_id) if visit else None
+            authors[s.id] = worker.first_name if worker else None
     return templates.TemplateResponse(request=request, name="elder/record.html", context={
-        "elder": session.elder,
-        "people": everyone,
-        "statements": [statement_out(s) for s in rows],
-        "user": session.user,
+        "elder": people.get_elder(ELDER_ID),
+        "statements": rows,
+        "people": people.list_people(ELDER_ID),
+        "authors": authors,
+        "pending_count": len(proposals.list_pending(ELDER_ID)),
     })
 
 
 @router.post("/statements/{statement_id}/visibility")
-def set_visibility(
-    statement_id: int,
-    visible_to: list[int] = Form(default=[]),
-    session: Session_ = Depends(elder_session),
-):
-    row = statements.get_statement(statement_id)
-    if row is None or row.elder_id != session.elder.id:
-        raise HTTPException(404, "Statement not found")
-    everyone = {p.id for p in people.list_people(session.elder.id) if p.role != "worker"}
+def set_visibility(statement_id: int, visible_to: list[int] = Form(default=[])):
+    everyone = {p.id for p in people.list_people(ELDER_ID)}
     statements.set_hidden_from(statement_id, sorted(everyone - set(visible_to)))
-    row = statements.get_statement(statement_id)
-    access_log.log_access(
-        session.elder.id, session.actor.label, "visibility_change", f'who can see "{row.statement[:50]}"'
-    )
     return RedirectResponse("/elder", status_code=303)
 
 
 @router.get("/access-log")
-def my_access_log(request: Request, limit: int = 50, session: Session_ = Depends(elder_session)):
-    entries = access_log.list_access(session.elder.id, limit=limit)
+def my_access_log(request: Request, limit: int = 50):
+    entries = access_log.list_access(ELDER_ID, limit=limit)
     return templates.TemplateResponse(request=request, name="elder/access_log.html", context={
-        "elder": session.elder,
-        "entries": [format_access_sentence(entry) for entry in entries],
-        "user": session.user,
+        "elder": people.get_elder(ELDER_ID),
+        "sentences": [format_access_sentence(e) for e in entries],
     })
 
 
 @router.get("/proposals")
-def my_proposals(request: Request, session: Session_ = Depends(elder_session)):
-    """The UI shows one at a time; ``first`` is the one to render, ``pending`` the rest."""
-    pending = [proposal_out(p) for p in proposals.list_pending(session.elder.id)]
+def my_proposals(request: Request):
+    """One card at a time -- the route slices, the template renders."""
+    pending = proposals.list_pending(ELDER_ID)
     return templates.TemplateResponse(request=request, name="elder/proposals.html", context={
-        "elder": session.elder,
+        "elder": people.get_elder(ELDER_ID),
         "proposal": pending[0] if pending else None,
-        "categories": config.CATEGORIES,
-        "user": session.user,
+        "remaining": max(0, len(pending) - 1),
     })
 
 
 @router.post("/proposals/{proposal_id}/decide")
-def decide_proposal(
-    proposal_id: int,
-    decision: str = Form(...),
-    category: str | None = Form(default=None),
-    session: Session_ = Depends(elder_session),
-):
-    if decision not in ("approve", "reject"):
-        raise HTTPException(422, "decision must be approve or reject")
-    if category and category not in config.CATEGORIES:
-        raise HTTPException(422, f"category must be one of {config.CATEGORIES}")
-    proposal = proposals.get_proposal(proposal_id)
-    if proposal is None or proposal.elder_id != session.elder.id:
-        raise HTTPException(404, "Proposal not found")
-    try:
-        if decision == "approve":
-            foldback.approve_proposal(proposal, session.actor, None, category or None)
-        else:
-            foldback.reject_proposal(proposal, session.actor, None)
-    except foldback.NotAllowed as exc:
-        raise HTTPException(403, exc.detail) from exc
+def decide_proposal(proposal_id: int, decision: str = Form(...)):
+    elder = people.get_elder(ELDER_ID)
+    label = elder.first_name if elder else "Elder"
+    if decision == "approve":
+        foldback.approve_proposal(proposal_id, label)
+    else:
+        foldback.reject_proposal(proposal_id, label)
     return RedirectResponse("/elder/proposals", status_code=303)
 
 
 # --- sentences ------------------------------------------------------------------
+# Built in Python, not Jinja, so they can be eyeballed in a REPL at hour thirteen.
 
-_VERBS = {
-    "view": "viewed",
-    "brief": "viewed",
-    "export": "exported",
-    "approved_proposal": "approved",
-    "rejected_proposal": "rejected",
-    "visibility_change": "changed",
-}
+_VERBS = {"view": "viewed", "brief": "viewed"}
 
 
-def _when(at: datetime, today: date | None = None) -> str:
-    today = today or date.today()
-    clock = f"{at.hour}:{at.minute:02d}"
-    if at.date() == today:
+def _when(at: datetime, today: date) -> str:
+    clock = f"{(at.hour - 1) % 12 + 1}:{at.minute:02d} {'am' if at.hour < 12 else 'pm'}"
+    days = (today - at.date()).days
+    if days == 0:
         return f"at {clock} today"
-
-    if (today - at.date()).days == 1:
+    if days == 1:
         return f"yesterday at {clock}"
-    if (today - at.date()).days < 7:
+    if days < 7:
         return f"on {at.strftime('%A')} at {clock}"
     return f"on {at.strftime('%B')} {at.day} at {clock}"
 
 
 def format_access_sentence(entry: AccessEntry, today: date | None = None) -> str:
-    """'Marie-Ève viewed your bathing preferences (7) at 9:52 today'."""
+    """"Marie-Ève viewed your bathing preferences at 9:52 today"."""
     verb = _VERBS.get(entry.action, entry.action.replace("_", " "))
-    return f"{entry.actor_label} {verb} {entry.target_summary} {_when(datetime.fromisoformat(entry.at), today)}"
+    when = _when(datetime.fromisoformat(entry.at), today or date.today())
+    return f"{entry.actor_label} {verb} {entry.target_summary} {when}"

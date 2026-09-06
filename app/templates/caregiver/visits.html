@@ -1,34 +1,107 @@
 {% extends "base.html" %}
 {% set layout = "console" %}
+{% block title %}Visits{% endblock %}
+
 {% macro state_badge(state) -%}
-  {% set labels = {'scheduled': 'Prévue', 'briefed': 'Brief consulté', 'completed': 'Terminée', 'expired': 'Expirée'} %}
-  <span class="status-badge" data-visit-state="{{ state }}">{{ labels.get(state, state) }}</span>
+  {% set colours = {'scheduled': 'bg-gray-100 text-gray-700', 'briefed': 'bg-blue-100 text-blue-800',
+                    'completed': 'bg-green-100 text-green-800', 'expired': 'bg-amber-100 text-amber-800'} %}
+  <span class="text-xs rounded px-1.5 py-0.5 {{ colours.get(state, 'bg-gray-100') }}">{{ state }}</span>
 {%- endmacro %}
-{% block title %}Visites — CareCircle{% endblock %}
+
+{% macro familiarity_tag(n) -%}
+  {% if n == 0 %}
+    <span class="text-xs font-medium text-blue-700">1st visit</span>
+  {% else %}
+    {% set suffix = {1: 'nd', 2: 'rd'}.get(n, 'th') %}
+    <span class="text-xs text-gray-500">{{ n + 1 }}{{ suffix }} visit</span>
+  {% endif %}
+{%- endmacro %}
+
 {% block content %}
-  <header>
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:0.5rem;">
-      <p class="eyebrow" style="margin:0;">CareCircle · Espace aidant</p>
-      {% if user %}
-        <div class="user-status" style="display:flex; align-items:center; gap:0.75rem; font-size:0.9rem;">
-          <span>Connecté : <strong>{{ user.name }}</strong> ({{ current_role }})</span>
-          <a href="/logout" style="color:#ef4444; font-weight:600; text-decoration:none;">Déconnexion</a>
-        </div>
+  <header class="mb-6">
+    <h1 class="text-2xl font-semibold">Visits</h1>
+    <nav class="text-sm mt-2 space-x-4">
+      <a class="underline" href="/caregiver/record">Record</a>
+      <a class="underline" href="/caregiver/proposals">Proposals</a>
+    </nav>
+  </header>
+
+  <form method="post" action="/caregiver/visits" class="border rounded-lg p-4 mb-8 space-y-3">
+    <label class="block text-sm">Worker
+      <select name="worker_id" class="border rounded p-1 ml-2">
+        <option value="">— Someone new —</option>
+        {% for w, count in workers %}
+          <option value="{{ w.id }}">{{ w.name }} — {{ count }} visit{{ 's' if count != 1 }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <details class="text-sm">
+      <summary class="cursor-pointer text-gray-600">Someone new</summary>
+      <div class="mt-2 space-y-2">
+        <input name="new_worker_name" placeholder="Name" class="border rounded p-1 w-full">
+        <input name="new_worker_role" placeholder="Role" value="care worker" class="border rounded p-1 w-full">
+        <input name="new_worker_language" placeholder="Language" value="fr" class="border rounded p-1 w-full">
+      </div>
+    </details>
+    <label class="block text-sm">Task
+      <select name="task_type" class="border rounded p-1 ml-2">
+        {% for t in task_types %}<option value="{{ t }}">{{ t.replace('_', ' ') }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="text-sm space-x-2">
+      <label>Start <input type="datetime-local" name="scheduled_start" required class="border rounded p-1"></label>
+      <label>End <input type="datetime-local" name="scheduled_end" required class="border rounded p-1"></label>
+    </div>
+    <button class="border rounded px-3 py-1.5 bg-gray-900 text-white">Create visit and generate link</button>
+  </form>
+
+  {% for row in rows %}
+    {% set v = row.visit %}
+    <div class="border-b py-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-sm">{{ v.date }} {{ v.start_hhmm }}</span>
+        <span class="text-sm text-gray-500">{{ v.task_type.replace('_', ' ') }}</span>
+        <span class="font-medium">{{ row.worker.name if row.worker else 'Unknown' }}</span>
+        {{ familiarity_tag(row.prior_visits if v.state != 'completed' else row.prior_visits - 1) }}
+        {{ state_badge(v.state) }}
+      </div>
+
+      {% if v.state == 'expired' and not row.checkout %}
+        <p class="text-sm text-amber-700 mt-1">No check-out.</p>
+      {% endif %}
+
+      {% if row.checkout %}
+        {% set c = row.checkout %}
+        <details class="mt-2">
+          <summary class="text-sm text-gray-600 cursor-pointer">Check-out</summary>
+          <div class="mt-2 space-y-2 text-sm">
+            <p>Task happened: <span class="font-medium">{{ c.completion }}</span></p>
+            <div class="flex flex-wrap gap-1">
+              {% for code in c.observation_codes %}
+                <span class="text-xs bg-gray-100 rounded px-1.5 py-0.5">{{ observation_labels.get(code, code) }}</span>
+              {% endfor %}
+            </div>
+            {% if c.note_text %}<p class="text-gray-600">{{ c.note_text }}</p>{% endif %}
+            {% if c.handover_note %}
+              <div class="border-l-4 border-gray-800 pl-3">
+                <p class="text-xs uppercase tracking-wide text-gray-500">For the next person</p>
+                <p>{{ c.handover_note }}</p>
+              </div>
+            {% endif %}
+            <details>
+              <summary class="cursor-pointer text-gray-600">This shouldn't happen again.</summary>
+              <form method="post" action="/caregiver/corrections" class="mt-2 flex gap-2">
+                <input type="hidden" name="visit_id" value="{{ v.id }}">
+                <input name="text" required minlength="3" maxlength="300" class="border rounded p-1 flex-1"
+                       placeholder="What should never happen again?">
+                <button class="border rounded px-2 py-1">Add correction</button>
+              </form>
+            </details>
+          </div>
+        </details>
       {% endif %}
     </div>
-    <h1>Visites de {{ elder.display_name }}</h1>
-    <nav aria-label="Console aidant"><a href="/caregiver/record">Dossier</a> <a href="/caregiver/visits">Visites</a> <a href="/caregiver/proposals">Propositions</a></nav>
-  </header>
-  <section><h2>Créer une visite</h2>
-    <form method="post" action="/caregiver/visits">
-      <p><label>Nom de l’intervenant <input name="worker_name" required></label></p>
-      <p><label>Rôle <select name="worker_role"><option value="personal_support_worker">Aide à domicile</option><option value="nurse">Infirmier ou infirmière</option></select></label></p>
-      <p><label>Langue <select name="worker_language"><option value="fr">Français</option><option value="en">English</option></select></label></p>
-      <p><label>Tâche <select name="task_type">{% for task in task_types %}<option value="{{ task }}">{{ task }}</option>{% endfor %}</select></label></p>
-      <p><label>Début <input type="datetime-local" name="scheduled_start" required></label></p>
-      <p><label>Fin <input type="datetime-local" name="scheduled_end" required></label></p>
-      <button type="submit">Créer la visite et générer le lien</button>
-    </form>
-  </section>
-  <section><h2>Historique</h2>{% for item in visits %}<article><h3>{{ item.visit.scheduled_start }} — {{ item.visit.worker_name }}</h3><p>{{ item.visit.task_type }} · {{ state_badge(item.visit.state) }}</p>{% if item.checkout %}<details><summary>Compte rendu</summary><p>Réalisation : {{ item.checkout.completion }}</p><p>Observations : {{ item.checkout.observation_codes | join(', ') or 'Aucune' }}</p>{% if item.checkout.note_text %}<p>{{ item.checkout.note_text }}</p>{% endif %}</details>{% endif %}</article>{% else %}<p>Aucune visite.</p>{% endfor %}</section>
+  {% else %}
+    <p class="text-gray-400">No visits yet.</p>
+  {% endfor %}
 {% endblock %}

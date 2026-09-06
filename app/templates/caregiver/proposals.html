@@ -1,19 +1,45 @@
 {% extends "base.html" %}
 {% set layout = "console" %}
-{% block title %}Propositions — CareCircle{% endblock %}
+{% block title %}Proposals{% endblock %}
 {% block content %}
-  <header>
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:0.5rem;">
-      <p class="eyebrow" style="margin:0;">CareCircle · Espace aidant</p>
-      {% if user %}
-        <div class="user-status" style="display:flex; align-items:center; gap:0.75rem; font-size:0.9rem;">
-          <span>Connecté : <strong>{{ user.name }}</strong> ({{ current_role }})</span>
-          <a href="/logout" style="color:#ef4444; font-weight:600; text-decoration:none;">Déconnexion</a>
-        </div>
-      {% endif %}
-    </div>
-    <h1>Propositions pour {{ elder.display_name }}</h1>
-    <nav aria-label="Console aidant"><a href="/caregiver/record">Dossier</a> <a href="/caregiver/visits">Visites</a> <a href="/caregiver/proposals">Propositions</a></nav>
+  <header class="mb-6">
+    <h1 class="text-2xl font-semibold">Pending record changes</h1>
+    <nav class="text-sm mt-2 space-x-4">
+      <a class="underline" href="/caregiver/record">Record</a>
+      <a class="underline" href="/caregiver/visits">Visits</a>
+    </nav>
   </header>
-  {% for proposal in proposals %}<article><p>« {{ proposal.suggested_statement }} »</p><p>Cette proposition provient d’observations structurées répétées.</p><form method="post" action="/caregiver/proposals/{{ proposal.id }}/decide"><input type="hidden" name="decision" value="approve"><label>Catégorie <select name="category">{% for category in categories %}<option value="{{ category }}">{{ category }}</option>{% endfor %}</select></label><button type="submit">Ajouter au dossier</button></form><form method="post" action="/caregiver/proposals/{{ proposal.id }}/decide"><input type="hidden" name="decision" value="reject"><button class="secondary" type="submit">Ignorer</button></form></article>{% else %}<p class="empty-state">Rien en attente. Les propositions apparaissent lorsque des observations semblent durables.</p>{% endfor %}
+
+  {% for p in proposals %}
+    {% set src = sources.get(p.id) %}
+    <div class="border rounded-lg p-4 mb-3">
+      <p class="text-xs uppercase tracking-wide text-gray-500">
+        {% if p.origin_kind == 'handover' %}
+          From a handover note{% if src %} — {{ src.worker }}, {{ src.date }}{% endif %}
+        {% elif p.origin_kind == 'pattern' %}
+          From a pattern — noted on several recent visits
+        {% else %}
+          From a correction
+        {% endif %}
+      </p>
+      <p class="my-2">{{ p.suggested_statement }}</p>
+      {% if src %}
+        <a class="text-xs underline text-gray-500" href="/caregiver/visits">See the check-out</a>
+      {% endif %}
+      <div class="flex gap-2 mt-3">
+        <form method="post" action="/caregiver/proposals/{{ p.id }}/decide">
+          <input type="hidden" name="decision" value="approve">
+          <button class="border rounded px-3 py-1.5 bg-gray-900 text-white">Add to record</button>
+        </form>
+        <form method="post" action="/caregiver/proposals/{{ p.id }}/decide">
+          <input type="hidden" name="decision" value="reject">
+          <button class="border rounded px-3 py-1.5">Dismiss</button>
+        </form>
+      </div>
+    </div>
+  {% else %}
+    <p class="text-gray-500">
+      Nothing pending. Proposals appear here when a worker leaves a note for the next person.
+    </p>
+  {% endfor %}
 {% endblock %}

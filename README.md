@@ -1,113 +1,136 @@
-# Eldercare
+# CareCircle
 
-Consent-gated care briefs for elderly people receiving in-home care. See
-[architecture.md](architecture.md) for the design and
-[new-architecture-implementation-guide.md](new-architecture-implementation-guide.md)
-for the module split this code follows.
+Care worker turnover is the problem. Families repeat the same history to every
+new worker, each worker arrives at her own approach, and the same mistakes
+recur. Knowledge about an elderly person accumulates inside individual workers
+and leaves when they do.
+
+Every visit gets a short brief before it and a short check-out after it. The
+brief carries forward what previous workers learned. The check-out captures what
+this worker learned before she disappears. **A seventh worker should arrive
+knowing what the first six figured out.**
+
+Built to [implementation-guide.md](implementation-guide.md).
+
+## Run it
+
+```bash
+python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python -m app.reset_db          # creates data/carecircle.db and seeds the demo history
+python run.py                   # http://127.0.0.1:8000
+```
+
+For a phone on the same network — **test this by hour four, not hour fourteen;
+conference wifi often blocks client-to-client traffic**:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Then set `ELDERCARE_BASE_URL` to your machine's LAN address so the QR code on the
+visit-created page points somewhere a phone can reach. `GET /health` confirms the
+tunnel works before you demo.
+
+### The API key is optional
+
+Copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY` to enable model-written
+briefs. With no key the app runs the deterministic fallback: candidates rendered
+verbatim, corrections first, sliced to six. **Nothing crashes when the key is
+absent** — that is the fallback guarantee, and you can demo the whole product
+without it.
 
 ## Layout
 
 ```
-app/                FastAPI + raw sqlite3 (guide Module 2)
-  schema.sql        the nine tables
-  repositories/     every SQL statement in the project
-  services/         visibility (THE resolver), tokens, brief, foldback
-  routes/           caregiver, elder, worker -- thin
-brief_builder/      the AI module (guide Module 3), pure Python, deletable
-data/               seed_data.json, observation_codes.json, eldercare.db (gitignored)
+app/
+  main.py            app, startup, routers
+  config.py          env vars and the closed lists
+  db.py              sqlite3 connection + query helpers
+  schema.sql         all ten tables, run with executescript
+  reset_db.py        drop, recreate, reseed — one command
+  seed.py            the demo history: 6 workers, 30 statements, 6 past visits
+  models.py          dataclasses mirroring the tables
+  repositories/      every SQL statement in the project lives here
+  services/
+    visibility.py    THE RESOLVER — the single read choke point
+    tokens.py        generation, hashing, window, validation
+    familiarity.py   how much this worker already knows
+    brief.py         cache → resolve → familiarity → AI → validate → persist
+    foldback.py      check-out → proposal → statement
+  ai/                the model, fully isolated. Delete it and the app still runs
+  routes/            home, caregiver, elder, worker — thin
+  templates/         Jinja2 + Tailwind CDN, no build step
+data/carecircle.db   gitignored
 ```
 
-The first server-rendered HTML templates are in `app/templates/`. Routes use the guide's
-paths and form field names and return JSON, so the Jinja layer can be added
-without changing the backend.
+**The one rule that keeps this clean:** routes never call `repositories.statements`
+for a read. They call `visibility.resolve()`. If you find yourself importing
+`repositories.statements` inside a route, stop.
 
-## Setup (Windows, PowerShell)
+## The three properties worth demonstrating
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+**One read path.** `services/visibility.py` is the only function that returns
+statement data. It applies the identity filter, then the purpose filter, then
+the time filter, then writes an access-log row — unconditionally, with no
+`if should_log` and no `skip_filters` bypass. There is exactly one function to
+audit.
+
+**The model cannot invent facts.** `ai/validator.py` drops any line whose
+`statement_id` is not in the candidate set. It never repairs a malformed line,
+because repairing means inventing. Correction and confirmation flags are set
+there from the database record, not taken from the model's response — the model
+may suggest something is critical, but it cannot demote a correction.
+
+**Hidden data never reaches the model.** `services/brief.py` calls
+`visibility.resolve()` *before* the model, so the model is only ever handed
+statements that already passed the consent gate. Do not "optimize" by resolving
+after the call.
+
+## Form field names
+
+The check-out posts `completion`, `observation_codes` (repeated),
+`note_text`, `handover_note`, and `confirm_{statement_id}` (`worked` / `didnt`).
+Statement visibility posts `visible_to` (repeated) — the route converts *visible*
+into *hidden* by set difference, because storing `hidden_from` is right for the
+resolver while showing "who can see this" is right for the human.
+
+## Demo path
+
+1. `/` — role picker. Not a product screen.
+2. **Caregiver → Visits** — create a visit for *someone new*. That path is not an
+   edge case; it is the problem.
+3. **Visit created** — the link, the QR, and the framing line:
+   *"Nour has never visited Amina. Her brief carries 30 notes from 6 previous workers."*
+4. **Worker brief** on a phone — corrections first with a red rule, then the
+   critical lines, `— 3 workers` on the confirmed approaches.
+5. **Check-out** — tick `refused equipment` (the seed carries two; this is the
+   third) and leave a handover note.
+6. **Caregiver → Proposals** — both proposals are now waiting, one labelled
+   *From a handover note*, one *From a pattern*.
+7. **Elder → access log** — *"Nour Haddad viewed your bathing preferences at 9:52 today."*
+
+Re-open the same worker link afterwards: *This link has expired.* One line, status
+200, no hint that anything else exists.
+
+## Tests
+
+```bash
+python -m unittest discover tests
+python -m app.ai._manual_test          # six AI scenarios; 3 and 6 are the ones to show
 ```
 
-## Run
+Scenario 3 returns **zero lines** for a returning worker with nothing changed —
+that proves the delta logic is real rather than cosmetic. Scenario 6 feeds the
+validator a fabricated `statement_id`; that line is dropped and the rest render.
 
-```powershell
-uvicorn app.main:app --reload          # from the repo root
-```
+## Notes
 
-API at `http://127.0.0.1:8000`, interactive docs at `/docs`. On first start
-`data/eldercare.db` is created and seeded. `POST /reset` deletes and reseeds it.
-Settings are env vars, see `.env.example`. Nothing crashes when
-`ANTHROPIC_API_KEY` is unset -- every brief takes the deterministic fallback.
+There is no religion field, no "cultural preferences" section, and no
+Muslim-specific anything. Every statement is entered the same way. If a judge
+asks how the *"Muslim-friendly is not one setting"* constraint is handled, the
+caregiver record screen is the answer: there is nowhere to put it, by design.
 
-For a phone on the same wifi run with `--host 0.0.0.0`; test that early.
-
-## Demo identity
-
-No real auth (architecture.md section 11). Caregiver routes act as the primary
-caregiver (Leila) by default; add `X-Actor-Person-Id: 2` to browse as the
-family member (Karim) and see `hidden_from` at work. Elder routes are always the
-elder. Workers send nothing -- only the token in the URL.
-
-## API
-
-POST bodies are `application/x-www-form-urlencoded` (list fields repeat the key).
-
-**Caregiver** (`/caregiver`)
-```
-GET  /caregiver/record                       statements grouped by category (via resolve)
-GET  /caregiver/people
-POST /caregiver/statements                   statement, category, applies_to_tasks*, excluded_tasks*,
-                                             time_start, time_end, hidden_from*
-POST /caregiver/statements/{id}/visibility   visible_to*  -> hidden_from by set difference
-GET  /caregiver/visits                       with check-outs; sweeps expired
-POST /caregiver/visits                       worker_name, worker_role, worker_language, task_type,
-                                             scheduled_start, scheduled_end  -> token + link (shown once)
-GET  /caregiver/visits/{id}
-GET  /caregiver/proposals?status=pending
-POST /caregiver/proposals/{id}/decide        decision=approve|reject [, category]
-```
-
-**Elder** (`/elder`)
-```
-GET  /elder                                  own record (via resolve)
-POST /elder/statements/{id}/visibility       visible_to*
-GET  /elder/access-log                       plain sentences, newest first
-GET  /elder/proposals                        first pending + the rest
-POST /elder/proposals/{id}/decide            decision=approve|reject
-```
-
-**Worker** (`/v`, token-scoped -- the whole surface a stranger can reach)
-```
-GET  /v/{token}                              the brief; invalid/expired/burned -> 200 {"expired": true}
-POST /v/{token}/checkout                     completion=yes|partial|no, observation_codes*, note_text
-                                             -> completes the visit, burns the token, may create proposals
-```
-
-**Meta**: `GET /health`, `POST /reset`
-
-## Quick loop
-
-```powershell
-$b = "http://127.0.0.1:8000"
-$start = (Get-Date).AddMinutes(-5).ToString("yyyy-MM-ddTHH:mm:ss"); $end = (Get-Date).AddMinutes(55).ToString("yyyy-MM-ddTHH:mm:ss")
-$v = Invoke-RestMethod -Method Post "$b/caregiver/visits" -Body @{worker_name="Marie-Ève Tremblay";worker_role="personal_support_worker";task_type="bathing";scheduled_start=$start;scheduled_end=$end}
-Invoke-RestMethod "$b/v/$($v.token)"                                                          # the brief
-Invoke-RestMethod -Method Post "$b/v/$($v.token)/checkout" -Body @{completion="partial";observation_codes="refused_bath"}
-Invoke-RestMethod "$b/v/$($v.token)"                                                          # -> expired
-Invoke-RestMethod "$b/elder/access-log" | Select-Object -First 3 -ExpandProperty sentence
-```
-
-The seeded visits already carry `refused_bath` twice; the check-out above is the
-third occurrence and creates a pending proposal (`PROPOSAL_THRESHOLD = 3`).
-
-## Fold-back and the model
-
-`services/foldback.py` is rules-only: an observation code seen 3 times in the
-last 5 check-outs becomes a pending proposal using the template on the
-observation code. A human approves it into the record; nothing writes a
-statement autonomously.
-
-`brief_builder/select.py` holds the `ModelClient` seam. Until a provider is
-plugged into `get_default_client()`, every brief takes the Stage 3 fallback
-(filtered statements verbatim, safety first) and `fallback_used` is `true`.
+The raw visit token exists in exactly two places — the URL, and the caregiver's
+screen at creation time. Only the SHA-256 hash is stored. It travels to the
+created-visit page in a query string; production would use a flash message.

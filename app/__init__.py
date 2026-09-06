@@ -1,5 +1,5 @@
-"""Eldercare backend -- FastAPI + raw sqlite3.
+"""CareCircle -- FastAPI + raw sqlite3, no ORM and no migrations.
 
-Run from the repo root: ``uvicorn app.main:app --reload``. ``brief_builder``
-(the AI module) is a sibling package at the repo root.
+Run from the repo root: ``uvicorn app.main:app --reload``, or ``python run.py``.
+Reset the database with ``python -m app.reset_db``.
 """

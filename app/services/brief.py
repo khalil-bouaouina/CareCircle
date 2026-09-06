@@ -1,91 +1,101 @@
-"""Brief pipeline orchestration (B14). No SQL, no HTTP, no prompt text.
+"""Brief pipeline orchestration (B17). No SQL, no HTTP, no prompt text.
 
-    build_brief(visit_id) -> (lines, fallback_used, total_active_statements)
-
-Ordering is load-bearing: ``visibility.resolve`` runs BEFORE the AI module is
-called. The model is only ever handed statements that already passed the
-consent gate. Hidden data never leaves the database, so it cannot leak through
-a model response, a prompt injection, or a logging accident. Do not "optimize"
-by resolving after the call.
+    build_brief(visit_id, force=False) -> BriefResult
 """
 
 from __future__ import annotations
 
-from brief_builder import Statement as ContractStatement
-from brief_builder import VisitContext, build_brief as _ai_build_brief
-
-from ..models import Actor, BriefLine, Purpose, Statement, Visit
-from ..repositories import people, statements, visits
+from .. import config
+from ..ai import selector, validator
+from ..models import Actor, BriefResult, Purpose
+from ..repositories import statements, visits, workers
+from . import familiarity as familiarity_service
 from . import visibility
 
 
-def worker_actor(visit: Visit) -> Actor:
-    """Workers hold no account. If a Person row with the same name exists we use
-    its id so per-person ``hidden_from`` applies; otherwise they are anonymous."""
-    person = people.find_worker_person(visit.elder_id, visit.worker_name)
-    return Actor(kind="worker", person_id=person.id if person else None, label=visit.worker_name)
-
-
-def _to_contract(s: Statement) -> ContractStatement:
-    return ContractStatement(
-        id=s.id,
-        statement=s.statement,
-        category=s.category,
-        applies_to_tasks=list(s.applies_to_tasks),
-        excluded_tasks=list(s.excluded_tasks),
-        time_start=s.time_start,
-        time_end=s.time_end,
-    )
-
-
-def build_brief(visit_id: int, force: bool = False) -> tuple[list[BriefLine], bool, int]:
+def build_brief(visit_id: int, force: bool = False) -> BriefResult:
     visit = visits.get_visit(visit_id)
     if visit is None:
         raise LookupError(f"visit {visit_id} not found")
-    total = statements.count_active(visit.elder_id)
+    worker = workers.get_worker(visit.worker_id)
+    if worker is None:
+        raise LookupError(f"worker {visit.worker_id} not found")
+
+    note_count = statements.count_active(visit.elder_id)
+    contributor_count = workers.count_contributing_workers(visit.elder_id)
+    fam = familiarity_service.assess(visit.elder_id, visit.worker_id)
 
     # 1. cache
     if not force:
         cached = visits.get_brief(visit_id)
         if cached is not None:
-            return cached.lines, cached.fallback_used, total
+            return BriefResult(
+                lines=cached.lines,
+                fallback_used=cached.fallback_used,
+                note_count=note_count,
+                contributor_count=contributor_count,
+                changed_count=len(cached.lines),
+                is_first_visit=fam.is_first_visit,
+            )
 
-    # 2. + 3. consent gate FIRST. Writes the access-log row.
+    # 2. + 3. The consent gate runs BEFORE the model is called. The model is only
+    # ever handed statements that already passed it, so hidden data cannot leak
+    # through a model response, a prompt injection, or a logging accident.
+    # Do not "optimize" by resolving after the call.
     candidates = visibility.resolve(
         visit.elder_id,
-        worker_actor(visit),
+        Actor(kind="worker", person_id=None, label=worker.name),
         Purpose(task_type=visit.task_type, window_start=visit.start_hhmm, window_end=visit.end_hhmm),
     )
 
-    # 4. nothing to say -> skip the model entirely
-    if not candidates:
-        lines: list[BriefLine] = []
-        fallback_used = False
-        model = None
-    else:
-        # 5. + 6. selection + validation (or fallback) on already-filtered rows only.
-        # brief_builder never raises because of the model; it falls back internally.
-        result = _ai_build_brief(
-            [_to_contract(s) for s in candidates],
-            VisitContext(
-                task_type=visit.task_type,
-                scheduled_start=visit.start_hhmm,
-                scheduled_end=visit.end_hhmm,
-                worker_role=visit.worker_role,
-                worker_language=visit.worker_language,
-            ),
-        )
-        allowed = {s.id for s in candidates}
-        lines = [
-            BriefLine(statement_id=l.statement_id, text=l.text, critical=bool(l.critical))
-            for l in result.lines
-            if l.statement_id in allowed  # belt and braces on P2
+    # 4. + 5. split by familiarity
+    changed_ids = familiarity_service.changed_since(candidates, fam.last_visit_at)
+    if not fam.is_first_visit:
+        candidates = [
+            s for s in candidates
+            if s.source == "correction"
+            or s.id in changed_ids
+            or (s.kind == "approach" and s.confirmations >= 2
+                and s.created_at > (fam.last_visit_at or ""))
         ]
-        fallback_used = result.fallback_used
-        model = result.model
+    changed_count = len(candidates)
 
-    # 7. persist, transition, return
+    # 6. an empty set is a valid, correct brief -- skip the model entirely
+    lines = []
+    fallback_used = False
+    model = None
+    if candidates:
+        by_id = {s.id: s for s in candidates}
+        try:
+            raw = selector.select_lines(visit, worker, candidates, fam, changed_ids)
+            model = config.ANTHROPIC_MODEL
+        except Exception:
+            fallback_used = True
+            raw = None
+
+        if raw is None:
+            lines = validator.fallback_lines(candidates)
+        else:
+            # 8. enforcement: every id must come from the candidate set
+            lines = validator.validate_lines(raw, set(by_id), by_id)
+            # An empty answer is a correct answer -- the model may have decided
+            # nothing here is worth saying. But a non-empty response that
+            # validated down to nothing is malformed, and that falls back.
+            if raw and not lines:
+                fallback_used = True
+                model = None
+                lines = validator.fallback_lines(candidates)
+
+    # 10. persist, transition, return
     visits.save_brief(visit_id, [l.statement_id for l in lines], lines, model, fallback_used)
     if visit.state == "scheduled":
         visits.set_state(visit_id, "briefed")
-    return lines, fallback_used, total
+
+    return BriefResult(
+        lines=lines,
+        fallback_used=fallback_used,
+        note_count=note_count,
+        contributor_count=contributor_count,
+        changed_count=changed_count,
+        is_first_visit=fam.is_first_visit,
+    )

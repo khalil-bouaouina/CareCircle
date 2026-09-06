@@ -1,11 +1,62 @@
 {% extends "base.html" %}
 {% set layout = "worker" %}
-{% block title %}Fin de visite{% endblock %}
+{% block title %}Check out{% endblock %}
 {% block content %}
-  <header><p>Fin de visite</p></header>
-  <form method="post" action="/v/{{ token }}/checkout">
-    <fieldset><legend>La tâche a-t-elle eu lieu ?</legend><div class="choice-list">{% for completion in completions %}<label class="choice"><input type="radio" name="completion" value="{{ completion }}" {% if loop.first %}required{% endif %}> {{ completion }}</label>{% endfor %}</div></fieldset>
-    <fieldset><legend>Avez-vous remarqué quelque chose ?</legend><div class="choice-list">{% for code in observation_codes %}<label class="choice"><input type="checkbox" name="observation_codes" value="{{ code.code }}"> {{ code.label_fr }}</label>{% endfor %}</div></fieldset>
-    <p><label>Autre information (facultatif)<br><textarea name="note_text" rows="3" maxlength="2000"></textarea></label></p><button type="submit">Envoyer</button>
+  <form method="post" action="/v/{{ token }}/checkout" class="pb-24 space-y-8">
+
+    <fieldset>
+      <legend class="font-medium mb-2">Did the task happen?</legend>
+      <div class="grid grid-cols-3 gap-2">
+        {% for c in completions %}
+          <label>
+            <input type="radio" name="completion" value="{{ c }}" class="peer sr-only"
+                   {% if loop.first %}required{% endif %}>
+            <span class="block text-center border rounded-lg py-3 peer-checked:bg-gray-900 peer-checked:text-white">
+              {{ {'yes': 'Yes', 'partial': 'Partly', 'no': 'No'}[c] }}
+            </span>
+          </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend class="font-medium mb-2">Anything you noticed?</legend>
+      <div class="grid grid-cols-2 gap-2">
+        {% for code, label in observation_codes %}
+          <label>
+            <input type="checkbox" name="observation_codes" value="{{ code }}" class="peer sr-only">
+            <span class="block text-center text-base border rounded-lg py-3 px-2 peer-checked:bg-gray-900 peer-checked:text-white">
+              {{ label }}
+            </span>
+          </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <div class="bg-gray-50 rounded-lg p-4">
+      <label class="block font-medium mb-2">Anything the next person should know?</label>
+      <textarea name="handover_note" rows="4" class="w-full border rounded p-2"
+                placeholder="Optional — a tip that made this easier."></textarea>
+      <p class="text-sm text-gray-500 mt-2">
+        Practical tips only. Please don't record medical observations here.
+      </p>
+    </div>
+
+    {% if shown_approaches %}
+      <fieldset>
+        <legend class="font-medium mb-2">Did these tips work?</legend>
+        {% for s in shown_approaches %}
+          <div class="py-2 border-b">
+            <p class="text-base">{{ s.statement }}</p>
+            <div class="flex gap-4 mt-1 text-base">
+              <label><input type="radio" name="confirm_{{ s.id }}" value="worked"> worked</label>
+              <label><input type="radio" name="confirm_{{ s.id }}" value="didnt"> didn't</label>
+            </div>
+          </div>
+        {% endfor %}
+      </fieldset>
+    {% endif %}
+
+    <button class="fixed bottom-0 left-0 right-0 p-4 bg-gray-900 text-white font-medium">Send</button>
   </form>
 {% endblock %}

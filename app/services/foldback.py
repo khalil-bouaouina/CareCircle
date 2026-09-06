@@ -1,34 +1,54 @@
-"""Check-out -> proposal -> statement (B13). Rule-based; the AI does not decide
-what enters the record (P4).
+"""Check-out -> proposal -> statement (B16).
 
-A code that appears in at least ``PROPOSAL_THRESHOLD`` of the last
-``PROPOSAL_WINDOW`` check-outs is a pattern, not an incident, and becomes a
-pending proposal using the template on the observation code. Nothing here
-writes a statement without a human decision.
+Rule-based, no AI. **The model does not decide what enters the record.**
 
-Who may decide depends on ``capacity_mode`` (architecture.md section 6):
-  self      -> the elder
-  assisted  -> the elder; the primary caregiver may only reject (cull noise)
-  mandated  -> the primary caregiver (representative); the elder still sees it in her log
+Two product decisions are embedded here, worth naming so nobody "fixes" them
+later. A threshold of three is what makes a proposal read as *"this is a
+pattern"* rather than *"this happened once."* And corrections skip the queue
+entirely, because a caregiver writing *"this must never happen again"* has
+already given approval; a second confirmation step is friction with no purpose.
 """
 
 from __future__ import annotations
 
 from .. import config
-from ..models import Actor, Elder, Proposal
-from ..repositories import access_log, checkouts, observation_codes, people, proposals, statements, visits
+from ..repositories import checkouts, proposals, statements, visits
+
+# A code with no template produces no proposal. Three or four entries is enough.
+PATTERN_TEMPLATES: dict[str, str] = {
+    "refused_equipment": "She has refused the equipment several times. Offer it once, "
+                         "then let it go rather than insisting.",
+    "didnt_finish_meal": "She has been leaving meals unfinished. Sit down with her and "
+                         "offer a smaller portion.",
+    "unsteady_on_feet": "She has been unsteady on her feet. Stay within arm's reach "
+                        "whenever she is standing.",
+    "seemed_more_tired": "She has seemed more tired than usual. Allow extra time and "
+                         "let her set the pace.",
+}
 
 
-class NotAllowed(Exception):
-    def __init__(self, detail: str):
-        super().__init__(detail)
-        self.detail = detail
+# --- check-out -> proposals ---------------------------------------------------
 
 
-# --- check-out -> proposals ------------------------------------------------------
+def from_handover_note(checkout_id: int) -> int | None:
+    """The note a departing worker leaves for the next person becomes a proposal."""
+    checkout = checkouts.get_checkout(checkout_id)
+    if checkout is None:
+        return None
+    note = (checkout.handover_note or "").strip()
+    if not note:
+        return None
+    visit = visits.get_visit(checkout.visit_id)
+    if visit is None or proposals.exists_pending_like(visit.elder_id, note):
+        return None
+    return proposals.create_proposal(
+        visit.elder_id, checkout_id, origin_kind="handover",
+        suggested_kind="approach", suggested_statement=note,
+    )
 
 
-def proposals_from_checkout(checkout_id: int) -> list[int]:
+def from_observation_patterns(checkout_id: int) -> list[int]:
+    """A code seen PATTERN_THRESHOLD times in the recent window is a pattern."""
     checkout = checkouts.get_checkout(checkout_id)
     if checkout is None:
         return []
@@ -38,97 +58,65 @@ def proposals_from_checkout(checkout_id: int) -> list[int]:
 
     created: list[int] = []
     for code in checkout.observation_codes:
-        count = checkouts.count_code_occurrences(visit.elder_id, code, last_n=config.PROPOSAL_WINDOW)
-        if count < config.PROPOSAL_THRESHOLD:
-            continue
-        template = observation_codes.template_for(code)
+        template = PATTERN_TEMPLATES.get(code)
         if not template:
-            continue  # a code with no template simply produces no proposal
-        if proposals.pending_exists(visit.elder_id, template):
             continue
-        created.append(proposals.create_proposal(visit.elder_id, checkout_id, template))
+        seen = checkouts.count_code_occurrences(visit.elder_id, code, last_n=config.PATTERN_WINDOW)
+        if seen < config.PATTERN_THRESHOLD:
+            continue
+        if proposals.exists_pending_like(visit.elder_id, template):
+            continue
+        created.append(proposals.create_proposal(
+            visit.elder_id, checkout_id, origin_kind="pattern",
+            suggested_kind="preference", suggested_statement=template,
+        ))
     return created
 
 
-# --- human decision -------------------------------------------------------------
+def from_correction(elder_id: int, visit_id: int, text: str, decided_by: str) -> int:
+    """Creates an active statement directly, bypassing the proposal queue."""
+    return statements.create_statement(
+        elder_id=elder_id,
+        statement=text.strip(),
+        kind="preference",
+        category="care",
+        source="correction",
+        origin_visit_id=visit_id,
+    )
 
 
-def _may_decide(elder: Elder, actor: Actor, actor_role: str | None, decision: str) -> None:
-    is_elder = actor.kind == "elder"
-    is_rep = actor.kind == "person" and actor_role == "primary_caregiver"
-    mode = elder.capacity_mode
-
-    if mode == "self":
-        if not is_elder:
-            raise NotAllowed("Only the elder decides on proposals (capacity mode: self)")
-    elif mode == "assisted":
-        if is_elder or (is_rep and decision == "reject"):
-            return
-        raise NotAllowed("In assisted mode the elder confirms proposals; the caregiver may only reject")
-    elif mode == "mandated":
-        if not is_rep:
-            raise NotAllowed("A legal representative decides on proposals (capacity mode: mandated)")
-    else:
-        raise NotAllowed(f"Unknown capacity mode {mode!r}")
+# --- proposal -> statement ----------------------------------------------------
 
 
-def _infer_category(proposal: Proposal) -> str:
-    code = observation_codes.code_for_template(proposal.suggested_statement)
-    return code.category if code else "care"
+def approve_proposal(proposal_id: int, decided_by: str) -> int:
+    """Marks accepted and creates the active statement. Returns its id."""
+    proposal = proposals.get_proposal(proposal_id)
+    if proposal is None or proposal.status != "pending":
+        raise LookupError(f"no pending proposal {proposal_id}")
 
-
-def _infer_tasks(proposal: Proposal) -> list[str]:
-    """A proposal born from one task's check-out is scoped to that task by default."""
-    if proposal.source_checkout_id is None:
-        return []
-    checkout = checkouts.get_checkout(proposal.source_checkout_id)
-    visit = visits.get_visit(checkout.visit_id) if checkout else None
-    return [visit.task_type] if visit else []
-
-
-def approve_proposal(
-    proposal: Proposal, actor: Actor, actor_role: str | None, category: str | None = None
-) -> int:
-    """Marks the proposal approved, creates an active statement, returns its id."""
-    elder = _elder_or_raise(proposal.elder_id)
-    _check_pending(proposal)
-    _may_decide(elder, actor, actor_role, "approve")
+    origin_visit_id = None
+    applies_to_tasks: list[str] = []
+    if proposal.source_checkout_id is not None:
+        checkout = checkouts.get_checkout(proposal.source_checkout_id)
+        visit = visits.get_visit(checkout.visit_id) if checkout else None
+        if visit is not None:
+            origin_visit_id = visit.id
+            # A proposal born from one task's check-out is scoped to that task.
+            applies_to_tasks = [visit.task_type]
 
     statement_id = statements.create_statement(
-        elder_id=elder.id,
+        elder_id=proposal.elder_id,
         statement=proposal.suggested_statement,
-        category=category or _infer_category(proposal),
-        applies_to_tasks=_infer_tasks(proposal),
-        excluded_tasks=[],
-        time_start=None,
-        time_end=None,
-        status="active",
+        kind=proposal.suggested_kind,
+        category="care",
+        source="worker",
+        applies_to_tasks=applies_to_tasks,
+        origin_visit_id=origin_visit_id,
         source_checkout_id=proposal.source_checkout_id,
     )
-    proposals.decide(proposal.id, "approved", actor.label)
-    access_log.log_access(
-        elder.id, actor.label, "approved_proposal", f'a proposed statement: "{proposal.suggested_statement[:60]}"'
-    )
+    proposals.decide(proposal_id, "accepted", decided_by)
     return statement_id
 
 
-def reject_proposal(proposal: Proposal, actor: Actor, actor_role: str | None) -> None:
-    elder = _elder_or_raise(proposal.elder_id)
-    _check_pending(proposal)
-    _may_decide(elder, actor, actor_role, "reject")
-    proposals.decide(proposal.id, "rejected", actor.label)
-    access_log.log_access(
-        elder.id, actor.label, "rejected_proposal", f'a proposed statement: "{proposal.suggested_statement[:60]}"'
-    )
-
-
-def _elder_or_raise(elder_id: int) -> Elder:
-    elder = people.get_elder(elder_id)
-    if elder is None:
-        raise NotAllowed("Unknown elder")
-    return elder
-
-
-def _check_pending(proposal: Proposal) -> None:
-    if proposal.status != "pending":
-        raise NotAllowed(f"Proposal already {proposal.status}")
+def reject_proposal(proposal_id: int, decided_by: str) -> None:
+    proposals.decide(proposal_id, "rejected", decided_by)

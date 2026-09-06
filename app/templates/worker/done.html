@@ -1,4 +1,10 @@
 {% extends "base.html" %}
 {% set layout = "worker" %}
-{% block title %}Merci{% endblock %}
-{% block content %}<p role="status">Merci. Ce lien est maintenant fermé.</p>{% endblock %}
+{% block title %}Thank you{% endblock %}
+{% block content %}
+  <div class="text-center mt-32 space-y-3">
+    <p>Thank you.</p>
+    {% if left_note %}<p>Your note will be passed to the next person.</p>{% endif %}
+    <p class="text-gray-500">This link is now closed.</p>
+  </div>
+{% endblock %}

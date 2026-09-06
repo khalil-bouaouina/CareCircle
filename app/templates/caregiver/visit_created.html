@@ -1,8 +1,33 @@
 {% extends "base.html" %}
 {% set layout = "console" %}
-{% block head %}<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script src="/static/app.js" defer></script>{% endblock %}
-{% block title %}Lien de visite — CareCircle{% endblock %}
+{% block title %}Visit created{% endblock %}
+{% block head %}<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>{% endblock %}
 {% block content %}
-  <header><p class="eyebrow">CareCircle · Espace aidant</p><h1>Visite créée</h1><p>Partagez ce lien avec l’intervenant. Il est valide de {{ valid_from }} à {{ valid_until }}.</p></header>
-  <p><code id="visit-link">{{ link }}</code></p><button type="button" data-copy-for="visit-link" onclick="copyLink('visit-link')">Copier le lien</button><div id="visit-qr" aria-label="Code QR du lien de visite"></div><script>window.addEventListener('DOMContentLoaded', () => renderQR('visit-qr', {{ link | tojson }}));</script><p><a href="{{ link }}" target="_blank" rel="noopener">Prévisualiser la vue intervenant</a></p><p><a href="/caregiver/visits">Retour aux visites</a></p>
+  <div class="text-center max-w-lg mx-auto py-8">
+    <p class="text-gray-600 mb-6">
+      {% if continuity.prior_visits == 0 %}
+        {{ worker.first_name }} has never visited {{ elder.first_name }}.
+        Her brief carries {{ continuity.note_count }} notes from {{ continuity.contributor_count }} previous workers.
+      {% else %}
+        This is {{ worker.first_name }}'s visit number {{ continuity.prior_visits + 1 }}.
+        Her brief carries only what has changed.
+      {% endif %}
+    </p>
+
+    <p id="link" class="font-mono text-sm break-all border rounded p-3 bg-gray-50">{{ link }}</p>
+    <button data-copy-for="link" onclick="copyLink('link')" class="border rounded px-3 py-1.5 mt-3">Copy link</button>
+
+    <div id="qr" class="flex justify-center my-6"></div>
+
+    <p class="text-sm text-gray-500">
+      Sent by SMS in production. Valid from {{ valid_from[11:16] }} to {{ valid_until[11:16] }}.
+    </p>
+
+    <div class="mt-6 space-x-4 text-sm">
+      <a class="underline" href="/caregiver/visits/{{ visit.id }}/preview">Preview what the worker will see</a>
+      <a class="underline" href="/caregiver/visits">Back to visits</a>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
+  <script>renderQR('qr', {{ link | tojson }});</script>
 {% endblock %}

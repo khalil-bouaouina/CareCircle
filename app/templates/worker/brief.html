@@ -1,12 +1,46 @@
 {% extends "base.html" %}
 {% set layout = "worker" %}
-{% block title %}Brief de visite{% endblock %}
+{% block title %}Brief{% endblock %}
 {% block content %}
   {% if expired %}
-    <p>Ce lien a expiré.</p>
+    <p class="text-center mt-32 text-gray-600">This link has expired.</p>
   {% else %}
-    <header><p>{{ header }}</p></header>
-    {% for line in lines %}<p{% if line.critical %} class="critical"{% endif %}>{{ line.text }}</p>{% endfor %}
-    <p class="brief-footer">{{ footer }}</p><p class="worker-action"><a href="/v/{{ token }}?screen=checkout">Terminé — 1 minute</a></p>
+    <div class="pb-24">
+      <p class="font-semibold mb-1">
+        {% if result.is_first_visit %}
+          First visit · {{ result.note_count }} notes from {{ result.contributor_count }} previous workers
+        {% else %}
+          Your {{ visit_ordinal }} visit ·
+          {%- if result.changed_count == 0 %} nothing has changed
+          {%- else %} {{ result.changed_count }} thing{{ 's' if result.changed_count != 1 }} ha{{ 's' if result.changed_count == 1 else 've' }} changed{% endif %}
+        {% endif %}
+      </p>
+      <p class="text-gray-500 mb-6">
+        {{ elder.first_name }} · {{ visit.task_type.replace('_', ' ') }} · {{ visit.start_hhmm }}
+      </p>
+
+      {% for line in result.lines %}
+        <p class="mb-5
+          {%- if line.is_correction %} border-l-4 border-red-500 pl-3 font-medium
+          {%- elif line.critical %} border-l-4 border-amber-500 pl-3 font-medium
+          {%- else %} pl-4{% endif %}">
+          {{ line.text }}
+          {% if line.confirmations >= 2 %}
+            <span class="text-sm text-gray-500">— {{ line.confirmations }} workers</span>
+          {% endif %}
+        </p>
+      {% else %}
+        <p class="pl-4 mb-5">Nothing has changed since your last visit.</p>
+      {% endfor %}
+    </div>
+
+    {% if preview %}
+      <p class="text-center text-sm text-gray-400">Preview — the worker's link is not used.</p>
+    {% else %}
+      <a href="/v/{{ token }}/checkout"
+         class="fixed bottom-0 left-0 right-0 p-4 bg-gray-900 text-white text-center font-medium">
+        Finished — 1 minute
+      </a>
+    {% endif %}
   {% endif %}
 {% endblock %}

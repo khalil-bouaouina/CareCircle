@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% set layout = "elder" %}
-{% block title %}Consultations — CareCircle{% endblock %}
+{% block title %}Who has looked at my information{% endblock %}
 {% block content %}
-  <header><p class="eyebrow">CareCircle · Mon espace</p><h1>Qui a consulté mes informations</h1><nav aria-label="Navigation"><a href="/elder">← Retour à mon dossier</a></nav></header>
-  {% if entries %}<ul class="access-log">{% for entry in entries %}<li>{{ entry }}</li>{% endfor %}</ul>{% else %}<p>Aucune consultation à afficher.</p>{% endif %}
+  <h1 class="text-3xl font-semibold mb-6">Who has looked at my information</h1>
+  {% for sentence in sentences %}
+    <p class="py-3 border-b">{{ sentence }}</p>
+  {% else %}
+    <p>Nobody has looked at your information yet.</p>
+  {% endfor %}
+  <p class="mt-8"><a class="underline" href="/elder">Back to my record</a></p>
 {% endblock %}

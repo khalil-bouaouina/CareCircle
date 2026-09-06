@@ -1,4 +1,4 @@
-"""Visit tokens (architecture.md section 8, guide B12).
+"""Visit tokens (B14).
 
 The token carries no data; it is a lookup key into a scope the server owns.
 Only the SHA-256 hash is stored. The raw token exists in exactly two places:
@@ -27,19 +27,25 @@ def hash_token(raw: str) -> str:
 
 
 def compute_window(scheduled_start: str, scheduled_end: str) -> tuple[str, str]:
-    """(valid_from, valid_until) = (start - lead, end + trail), ISO strings."""
-    start = datetime.fromisoformat(scheduled_start)
-    end = datetime.fromisoformat(scheduled_end)
-    valid_from = start - timedelta(minutes=config.TOKEN_LEAD_MINUTES)
-    valid_until = end + timedelta(hours=config.TOKEN_TRAIL_HOURS)
-    return valid_from.isoformat(), valid_until.isoformat()
+    """(valid_from, valid_until), applying TOKEN_LEAD_MINUTES and TOKEN_TRAIL_HOURS."""
+    start = datetime.fromisoformat(scheduled_start) - timedelta(minutes=config.TOKEN_LEAD_MINUTES)
+    end = datetime.fromisoformat(scheduled_end) + timedelta(hours=config.TOKEN_TRAIL_HOURS)
+    return start.isoformat(), end.isoformat()
+
+
+def issue(visit_id: int, scheduled_start: str, scheduled_end: str) -> str:
+    """Mint a token for an existing visit and return the raw value once."""
+    raw, token_hash = new_token()
+    valid_from, valid_until = compute_window(scheduled_start, scheduled_end)
+    visits.set_token(visit_id, token_hash, valid_from, valid_until)
+    return raw
 
 
 def validate(raw: str, now: datetime | None = None) -> Visit | None:
     """Return the visit for a live token, else None.
 
-    None when: unknown hash, state is completed/expired, or now is outside the
-    window. Callers must not distinguish these cases to the worker.
+    None when: unknown hash, state is completed or expired, or now is outside
+    the window. Callers must not distinguish these cases to the worker.
     """
     now = now or datetime.now()
     visit = visits.get_visit_by_token_hash(hash_token(raw))
@@ -56,7 +62,7 @@ def validate(raw: str, now: datetime | None = None) -> Visit | None:
 
 
 def expire_stale(now: datetime | None = None) -> int:
-    """Sweep: live visits whose window has passed become expired. Returns count."""
+    """Sweep: live visits whose window has passed become expired."""
     now = now or datetime.now()
     stale = visits.list_live_past_window(now.replace(microsecond=0).isoformat())
     for visit in stale:
