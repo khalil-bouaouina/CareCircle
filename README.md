@@ -129,7 +129,102 @@ own care.
 
 ---
 
-## 3. Architecture
+## 3. Features
+
+### The brief — six lines, chosen for this task and this worker
+
+The record may hold thirty sentences. Only some apply to bathing. Only some apply
+at 10am. Only some are new to this worker. Every sentence carries its task and its
+hours from the moment it is written, so choosing the right ones is a matter of
+checking which ones match. A model then picks the six that matter most and rewrites
+each as one clean line.
+
+The model can only choose from the sentences it is handed. Every line it returns
+must carry the number of the sentence it came from, and a line without a valid
+number is thrown away before it reaches the screen. It picks and rewords. It never
+adds.
+
+If the model is slow or broken, the filtered sentences show exactly as they were
+written. The brief still works.
+
+### The check-out — three parts, one minute
+
+Twelve observation buttons, a fixed list. Workers cannot type their own. That is
+what makes them countable: three workers tapping *didn't finish meal* is a number,
+not three separate comments nobody compares.
+
+One free text box, for one thing only: what the next person should know.
+
+### The handover — a worker's note is an opinion until the family says otherwise
+
+A note written at check-out does not go into the record. It becomes a suggestion.
+The family reads it and taps approve or dismiss. Approved, it becomes a permanent
+sentence with her name on it.
+
+### Confirmation — how many workers backed this
+
+When several workers are given the same tip and it works, the tip shows how many
+of them confirmed it. A tip three people confirmed is stronger than one person's
+guess, and the brief says so.
+
+### Corrections — one button, one line, top of every brief
+
+When something goes wrong, the family clicks one button on that visit and writes
+one line. That line goes to the top of every future brief, marked, for every
+worker, whether she has been here before or not.
+
+This is how *the same mistake keeps happening* becomes *it happened once and then
+it was written down*.
+
+### Repeat detection — three times in five visits
+
+The observation buttons are counted across visits. When the same one is tapped
+three times in the last five visits, the system suggests adding it to the record.
+Three different workers each noticing something once now adds up to something the
+family sees.
+
+### First visit or fifth — the brief knows the difference
+
+The system counts how many times each worker has been to this home. A new worker
+gets the full brief. A returning worker gets only what changed since she was last
+here — every sentence records when it was last edited, and every visit records
+when it happened.
+
+Her brief can be one line. It can be zero lines, saying nothing has changed. That
+is a correct brief, and it is shown as one.
+
+### The counter — the product in one line
+
+At the top of every brief:
+
+> **First visit · 30 notes from 6 previous workers**
+
+Normally the seventh worker knows nothing. Here she starts with what six people
+learned.
+
+### Access control — the elderly person owns the record
+
+She can hide any sentence from any specific person. A worker sees only what her
+task requires: she cannot look at anything else, cannot see other visits, cannot
+see who else has been here.
+
+Every time anyone reads any part of the record, a line is written. She can read
+those lines:
+
+> Marie-Ève viewed your bathing preferences at 9:52 today.
+
+She can see who looked. Nobody can quietly cut her out of her own care.
+
+### Capacity — three settings, not a yes or no
+
+She decides. Or she decides, and changes are shown to her to confirm. Or someone
+legally appointed decides, and she can still see that it happened.
+
+Most people have good days and bad days. Every other system makes you pick one.
+
+---
+
+## 4. Architecture
 
 **Dominant pattern: a layered monolith with one enforced choke point.** Four
 layers, strict one-directional dependencies, and every statement read funnelled
@@ -247,7 +342,7 @@ for contributors and agents: [AGENTS.md](AGENTS.md).
 
 ---
 
-## 4. Run it for the first time
+## 5. Run it for the first time
 
 **Requires Python 3.12+.** Nothing else — no Node, no build step, no Docker, no
 API key.
@@ -315,7 +410,7 @@ Reset to a clean demo state at any time with `python -m app.reset_db`.
 
 ---
 
-## 5. The scripted demo path
+## 6. The scripted demo path
 
 Seven steps, ~3 minutes, tested end to end. The seed is built so that step 5
 fires a real proposal live rather than a staged one.
@@ -344,7 +439,7 @@ The seeded history is 1 elder, 4 family members, 7 workers, 30 statements,
 
 ---
 
-## 6. Tests
+## 7. Tests
 
 ```bash
 python -m unittest discover tests      # 23 tests
@@ -372,7 +467,7 @@ rather than cosmetic; **scenario 6** feeds the validator a fabricated
 
 ---
 
-## 7. Cost and sustainability
+## 8. Cost and sustainability
 
 The running cost of this system is close to the floor, on purpose.
 
@@ -399,7 +494,7 @@ is the buyer.
 
 ---
 
-## 8. Deliberate scope decisions
+## 9. Deliberate scope decisions
 
 Not oversights — decisions, and worth stating as such at Q&A.
 
@@ -429,7 +524,7 @@ needs.**
 
 ---
 
-## 9. Repo map
+## 10. Repo map
 
 ```
 app/
